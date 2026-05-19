@@ -187,6 +187,11 @@ export default function DashboardClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterOwner, setFilterOwner] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterDepartment, setFilterDepartment] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
 
   const refreshCompliances = async () => {
     const supabase = getBrowserSupabaseClient();
@@ -428,6 +433,47 @@ export default function DashboardClient() {
     ],
   } as Record<string, SelectOption[]>;
 
+  const statusOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'critical', label: 'Critical' },
+    { value: 'high', label: 'High' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'normal', label: 'Normal' },
+  ];
+
+  const filteredCompliances = compliances.filter((row) => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (normalizedQuery && !row.certificate_name?.toLowerCase().includes(normalizedQuery)) {
+      return false;
+    }
+
+    if (filterOwner && row.owner_id !== filterOwner) {
+      return false;
+    }
+
+    if (filterCategory && row.category_id !== filterCategory) {
+      return false;
+    }
+
+    if (filterDepartment && row.department_id !== filterDepartment) {
+      return false;
+    }
+
+    if (filterStatus !== 'all' && row.status?.toLowerCase() !== filterStatus) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const resetFilters = () => {
+    setSearchQuery('');
+    setFilterOwner('');
+    setFilterCategory('');
+    setFilterDepartment('');
+    setFilterStatus('all');
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-10">
       {deleteTargetId ? (
@@ -495,6 +541,103 @@ export default function DashboardClient() {
               </div>
           </div>
 
+          <div className="mb-6 grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(5,minmax(0,1fr))]">
+            <label className="sr-only" htmlFor="search-query">
+              Search certificates
+            </label>
+            <input
+              id="search-query"
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search certificate name"
+              className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-200 outline-none ring-1 ring-transparent transition focus:border-slate-500 focus:ring-slate-500"
+            />
+
+            <div>
+              <label className="sr-only" htmlFor="filter-owner">
+                Owner filter
+              </label>
+              <select
+                id="filter-owner"
+                value={filterOwner}
+                onChange={(event) => setFilterOwner(event.target.value)}
+                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-200 outline-none ring-1 ring-transparent transition focus:border-slate-500 focus:ring-slate-500"
+              >
+                <option value="">Owner</option>
+                {owners.map((owner) => (
+                  <option key={owner.value} value={owner.value}>
+                    {owner.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="sr-only" htmlFor="filter-category">
+                Category filter
+              </label>
+              <select
+                id="filter-category"
+                value={filterCategory}
+                onChange={(event) => setFilterCategory(event.target.value)}
+                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-200 outline-none ring-1 ring-transparent transition focus:border-slate-500 focus:ring-slate-500"
+              >
+                <option value="">Category</option>
+                {categories.map((category) => (
+                  <option key={category.value} value={category.value}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="sr-only" htmlFor="filter-department">
+                Department filter
+              </label>
+              <select
+                id="filter-department"
+                value={filterDepartment}
+                onChange={(event) => setFilterDepartment(event.target.value)}
+                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-200 outline-none ring-1 ring-transparent transition focus:border-slate-500 focus:ring-slate-500"
+              >
+                <option value="">Department</option>
+                {departments.map((department) => (
+                  <option key={department.value} value={department.value}>
+                    {department.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="sr-only" htmlFor="filter-status">
+                Status filter
+              </label>
+              <select
+                id="filter-status"
+                value={filterStatus}
+                onChange={(event) => setFilterStatus(event.target.value)}
+                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-200 outline-none ring-1 ring-transparent transition focus:border-slate-500 focus:ring-slate-500"
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="rounded-2xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-700"
+            >
+              Clear
+            </button>
+          </div>
+
           {isLoading ? (
             <div className="rounded-3xl border border-slate-800 bg-slate-950/90 p-8 text-slate-300">Loading compliances...</div>
           ) : loadError ? (
@@ -519,7 +662,7 @@ export default function DashboardClient() {
                   </tr>
                 </thead>
                 <tbody>
-                  {compliances.map((row) => (
+                  {filteredCompliances.map((row) => (
                     <tr key={row.compliance_id} className="even:bg-slate-950/70 hover:bg-slate-900/80">
                       <td className="border-b border-slate-800 px-4 py-3 text-slate-300">{row.certificate_no}</td>
                       <td className="border-b border-slate-800 px-4 py-3">
