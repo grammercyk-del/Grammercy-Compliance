@@ -45,6 +45,19 @@ type OwnerRiskScore = {
   risk_score: number;
 };
 
+type AuditHistoryRow = {
+  compliance_id: string;
+  certificate_no: string;
+  certificate_name: string;
+  category_name: string;
+  department_name: string;
+  owner_name: string;
+  last_renewed_date: string | null;
+  next_renewal_date: string | null;
+  status: 'critical' | 'high' | 'medium' | 'normal' | 'deleted' | string;
+  deleted_at: string | null;
+};
+
 type SelectOption = { value: string; label: string; defaultOwnerId?: string | null };
 
 type EditableCellProps = {
@@ -208,6 +221,9 @@ export default function DashboardClient() {
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [alertsCollapsed, setAlertsCollapsed] = useState({ critical: false, high: false, medium: false });
   const [ownerRiskScores, setOwnerRiskScores] = useState<OwnerRiskScore[]>([]);
+  const [auditHistory, setAuditHistory] = useState<AuditHistoryRow[]>([]);
+  const [auditHistoryCollapsed, setAuditHistoryCollapsed] = useState(true);
+  const [auditHistoryLoading, setAuditHistoryLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOwner, setFilterOwner] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -265,6 +281,31 @@ export default function DashboardClient() {
 
     const sortedData = ((result.data ?? []) as OwnerRiskScore[]).sort((a, b) => b.risk_score - a.risk_score);
     setOwnerRiskScores(sortedData);
+  };
+
+  const loadAuditHistory = async () => {
+    if (!auditHistoryCollapsed) return; // already expanded, don't refetch
+    setAuditHistoryLoading(true);
+    const supabase = getBrowserSupabaseClient();
+    const result = await supabase
+      .from('compliances_with_status_all')
+      .select('compliance_id, certificate_no, certificate_name, category_name, department_name, owner_name, last_renewed_date, next_renewal_date, status, deleted_at')
+      .order('updated_at', { ascending: false });
+
+    if (result.error) {
+      console.error('Error loading audit history:', result.error);
+      setAuditHistory([]);
+    } else {
+      setAuditHistory((result.data ?? []) as AuditHistoryRow[]);
+    }
+    setAuditHistoryLoading(false);
+  };
+
+  const toggleAuditHistory = async () => {
+    if (auditHistoryCollapsed) {
+      await loadAuditHistory();
+    }
+    setAuditHistoryCollapsed(!auditHistoryCollapsed);
   };
 
   useEffect(() => {
@@ -1068,6 +1109,101 @@ export default function DashboardClient() {
               </tbody>
             </table>
           </div>
+        </section>
+
+        {/* Audit History Section */}
+        <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl shadow-slate-950/30">
+          <button
+            type="button"
+            onClick={toggleAuditHistory}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <div>
+              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Audit History</p>
+              <h2 className="mt-2 text-2xl font-semibold text-white">All Records (Including Deleted)</h2>
+            </div>
+            <span className="text-slate-300">{auditHistoryCollapsed ? '▸' : '▾'}</span>
+          </button>
+
+          {!auditHistoryCollapsed && (
+            <div className="mt-6">
+              {auditHistoryLoading ? (
+                <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-8 text-center text-slate-300">
+                  Loading audit history...
+                </div>
+              ) : auditHistory.length === 0 ? (
+                <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-8 text-center text-slate-400">
+                  No audit history available
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/80">
+                  <table className="min-w-full border-collapse text-left text-sm text-slate-200">
+                    <thead className="bg-slate-900/90 text-slate-400">
+                      <tr>
+                        <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Certificate No</th>
+                        <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Certificate Name</th>
+                        <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium text-center">Status</th>
+                        <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Owner</th>
+                        <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Category</th>
+                        <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Department</th>
+                        <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Last Renewed</th>
+                        <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Next Renewal</th>
+                        <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Deleted At</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditHistory.map((row) => {
+                        const isDeleted = row.status === 'deleted';
+                        return (
+                          <tr
+                            key={row.compliance_id}
+                            className={`even:bg-slate-950/70 ${isDeleted ? 'opacity-60' : 'hover:bg-slate-900/80'}`}
+                          >
+                            <td className={`border-b border-slate-800 px-4 py-3 ${isDeleted ? 'text-slate-500' : 'text-slate-300'}`}>
+                              {row.certificate_no}
+                            </td>
+                            <td className={`border-b border-slate-800 px-4 py-3 ${isDeleted ? 'text-slate-500 line-through' : 'font-semibold text-slate-100'}`}>
+                              {row.certificate_name}
+                            </td>
+                            <td className="border-b border-slate-800 px-4 py-3 text-center">
+                              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                                isDeleted ? 'bg-slate-500/15 text-slate-400 ring-slate-500/30' :
+                                statusClasses[row.status] ?? statusClasses.normal
+                              }`}>
+                                {row.status}
+                              </span>
+                            </td>
+                            <td className={`border-b border-slate-800 px-4 py-3 ${isDeleted ? 'text-slate-500' : 'text-slate-300'}`}>
+                              {row.owner_name || '—'}
+                            </td>
+                            <td className={`border-b border-slate-800 px-4 py-3 ${isDeleted ? 'text-slate-500' : 'text-slate-300'}`}>
+                              {row.category_name || '—'}
+                            </td>
+                            <td className={`border-b border-slate-800 px-4 py-3 ${isDeleted ? 'text-slate-500' : 'text-slate-300'}`}>
+                              {row.department_name || '—'}
+                            </td>
+                            <td className={`border-b border-slate-800 px-4 py-3 ${isDeleted ? 'text-slate-500' : 'text-slate-300'}`}>
+                              {row.last_renewed_date || '—'}
+                            </td>
+                            <td className={`border-b border-slate-800 px-4 py-3 ${isDeleted ? 'text-slate-500' : 'text-slate-300'}`}>
+                              {row.next_renewal_date || '—'}
+                            </td>
+                            <td className="border-b border-slate-800 px-4 py-3">
+                              {isDeleted && row.deleted_at ? (
+                                <span className="text-slate-500">{row.deleted_at}</span>
+                              ) : (
+                                <span className="text-slate-600">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </div>
     </main>
