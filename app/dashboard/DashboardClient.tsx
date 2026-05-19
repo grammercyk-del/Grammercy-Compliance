@@ -450,7 +450,6 @@ export default function DashboardClient() {
 
     const { data, error } = await supabase.from('compliances').insert([{
       certificate_name: newCompliance.certificate_name,
-      certificate_no: newCompliance.certificate_no,
       category_id: newCompliance.category_id,
       department_id: newCompliance.department_id,
       owner_id: newCompliance.owner_id,
