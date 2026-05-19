@@ -27,6 +27,14 @@ type TableRow = ComplianceRow & {
   isNew?: boolean;
 };
 
+type AlertRow = {
+  certificate_name: string;
+  owner_name: string;
+  category_name: string;
+  days_remaining: number;
+  status: 'critical' | 'high' | 'medium' | string;
+};
+
 type SelectOption = { value: string; label: string; defaultOwnerId?: string | null };
 
 type EditableCellProps = {
@@ -187,6 +195,8 @@ export default function DashboardClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<AlertRow[]>([]);
+  const [alertsCollapsed, setAlertsCollapsed] = useState({ critical: false, high: false, medium: false });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOwner, setFilterOwner] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -213,6 +223,21 @@ export default function DashboardClient() {
     }
 
     setIsLoading(false);
+  };
+
+  const refreshAlerts = async () => {
+    const supabase = getBrowserSupabaseClient();
+    const result = await supabase
+      .from('critical_alerts')
+      .select('certificate_name, owner_name, category_name, days_remaining, status');
+
+    if (result.error) {
+      console.error('Error loading critical alerts:', result.error);
+      setAlerts([]);
+      return;
+    }
+
+    setAlerts((result.data ?? []) as AlertRow[]);
   };
 
   useEffect(() => {
@@ -256,12 +281,17 @@ export default function DashboardClient() {
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'compliances' }, () => {
         refreshCompliances();
+        refreshAlerts();
       })
       .subscribe();
 
     loadOptions();
     refreshCompliances();
-    intervalId = window.setInterval(refreshCompliances, 60000);
+    refreshAlerts();
+    intervalId = window.setInterval(() => {
+      refreshCompliances();
+      refreshAlerts();
+    }, 60000);
 
     return () => {
       mounted = false;
@@ -479,6 +509,42 @@ export default function DashboardClient() {
   const dueSoonCount = filteredCompliances.filter((row) => row.status === 'high' || row.status === 'medium').length;
   const criticalCount = filteredCompliances.filter((row) => row.status === 'critical').length;
 
+  const alertGroups = {
+    critical: alerts.filter((alert) => alert.status?.toLowerCase() === 'critical'),
+    high: alerts.filter((alert) => alert.status?.toLowerCase() === 'high'),
+    medium: alerts.filter((alert) => alert.status?.toLowerCase() === 'medium'),
+  };
+
+  const totalAlerts = alerts.length;
+
+  const alertSectionMeta: Record<'critical' | 'high' | 'medium', { label: string; ringClass: string; bgClass: string; textClass: string }> = {
+    critical: {
+      label: '🔴 Critical',
+      ringClass: 'ring-red-500/30',
+      bgClass: 'bg-red-950/60',
+      textClass: 'text-red-200',
+    },
+    high: {
+      label: '🟠 High',
+      ringClass: 'ring-orange-500/30',
+      bgClass: 'bg-orange-950/60',
+      textClass: 'text-orange-200',
+    },
+    medium: {
+      label: '🟡 Medium',
+      ringClass: 'ring-amber-500/30',
+      bgClass: 'bg-amber-950/60',
+      textClass: 'text-amber-200',
+    },
+  };
+
+  const toggleAlertCollapse = (status: 'critical' | 'high' | 'medium') => {
+    setAlertsCollapsed((current) => ({
+      ...current,
+      [status]: !current[status],
+    }));
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-10">
       {deleteTargetId ? (
@@ -545,6 +611,70 @@ export default function DashboardClient() {
               <p className="mt-3 text-4xl font-semibold text-red-200">{criticalCount}</p>
             </div>
           </div>
+
+          <div className="mb-6 rounded-3xl border border-slate-800 bg-slate-950/80 p-6">
+            {totalAlerts === 0 ? (
+              <div className="rounded-3xl border border-emerald-700/40 bg-emerald-950/60 p-5 text-emerald-200">
+                All certifications are on track
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {(['critical', 'high', 'medium'] as const).map((status) => {
+                  const group = alertGroups[status];
+                  const meta = alertSectionMeta[status];
+                  const isCollapsed = alertsCollapsed[status];
+                  return (
+                    <div key={status} className={`rounded-3xl border ${meta.ringClass} ${meta.bgClass} p-4`}>
+                      <button
+                        type="button"
+                        onClick={() => toggleAlertCollapse(status)}
+                        className="flex w-full items-center justify-between text-left"
+                      >
+                        <div>
+                          <p className={`text-sm uppercase tracking-[0.3em] ${meta.textClass}`}>{meta.label}</p>
+                          <p className={`mt-1 text-lg font-semibold ${meta.textClass}`}>{group.length} alert{group.length === 1 ? '' : 's'}</p>
+                        </div>
+                        <span className="text-slate-300">{isCollapsed ? '▸' : '▾'}</span>
+                      </button>
+                      {!isCollapsed ? (
+                        <div className="mt-4 space-y-3">
+                          {group.map((alert, index) => {
+                            const overdue = alert.days_remaining < 0;
+                            return (
+                              <div key={`${alert.certificate_name}-${index}`} className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                  <div className="space-y-1">
+                                    <p className="font-semibold text-slate-100">{alert.certificate_name}</p>
+                                    <p className="text-sm text-slate-400">{alert.owner_name} • {alert.category_name}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    {overdue ? (
+                                      <p className="inline-flex items-center gap-2 text-sm font-semibold text-red-300">
+                                        <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-red-400" />
+                                        {Math.abs(alert.days_remaining)} days overdue
+                                      </p>
+                                    ) : (
+                                      <p className="text-sm text-slate-300">Due in {alert.days_remaining} days</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {group.length === 0 ? (
+                            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-sm text-slate-400">
+                              No {meta.label.toLowerCase()} alerts
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Compliance table</p>
