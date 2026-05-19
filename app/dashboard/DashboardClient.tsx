@@ -23,10 +23,14 @@ type ComplianceRow = {
   notes: string | null;
 };
 
-type SelectOption = { value: string; label: string };
+type TableRow = ComplianceRow & {
+  isNew?: boolean;
+};
+
+type SelectOption = { value: string; label: string; defaultOwnerId?: string | null };
 
 type EditableCellProps = {
-  row: ComplianceRow;
+  row: TableRow;
   field: keyof ComplianceRow;
   value: string | number | null;
   isEditor: boolean | null;
@@ -176,12 +180,34 @@ function EditableCell({ row, field, value, isEditor, type, options, onSave }: Ed
 
 export default function DashboardClient() {
   const isEditor = useContext(IsEditorContext);
-  const [compliances, setCompliances] = useState<ComplianceRow[]>([]);
+  const [compliances, setCompliances] = useState<TableRow[]>([]);
   const [owners, setOwners] = useState<SelectOption[]>([]);
   const [categories, setCategories] = useState<SelectOption[]>([]);
   const [departments, setDepartments] = useState<SelectOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const refreshCompliances = async () => {
+    const supabase = getBrowserSupabaseClient();
+    setIsLoading(true);
+    setLoadError(null);
+
+    const result = await supabase
+      .from('compliances_with_status')
+      .select(
+        'compliance_id, certificate_no, certificate_name, category_name, category_id, department_name, department_id, owner_name, owner_id, renewal_frequency, last_renewed_date, next_renewal_date, days_remaining, status, notes'
+      );
+
+    if (result.error) {
+      console.error('Error loading compliances:', result.error);
+      setLoadError(result.error.message || 'Unable to load compliances');
+      setCompliances([]);
+    } else {
+      setCompliances((result.data ?? []) as TableRow[]);
+    }
+
+    setIsLoading(false);
+  };
 
   useEffect(() => {
     const supabase = getBrowserSupabaseClient();
@@ -192,7 +218,7 @@ export default function DashboardClient() {
     async function loadOptions() {
       const [ownersResult, categoriesResult, departmentsResult] = await Promise.all([
         supabase.from('active_owners').select('owner_id, owner_name'),
-        supabase.from('active_categories').select('category_id, category_name'),
+        supabase.from('active_categories').select('category_id, category_name, default_owner_id'),
         supabase.from('active_departments').select('department_id, department_name'),
       ]);
 
@@ -207,7 +233,11 @@ export default function DashboardClient() {
       if (categoriesResult.error) {
         console.error('Error loading categories:', categoriesResult.error);
       } else {
-        setCategories((categoriesResult.data ?? []).map((item: any) => ({ value: item.category_id, label: item.category_name })));
+        setCategories((categoriesResult.data ?? []).map((item: any) => ({
+          value: item.category_id,
+          label: item.category_name,
+          defaultOwnerId: item.default_owner_id,
+        })));
       }
 
       if (departmentsResult.error) {
@@ -217,38 +247,15 @@ export default function DashboardClient() {
       }
     }
 
-    async function loadCompliances() {
-      setIsLoading(true);
-      setLoadError(null);
-
-      const result = await supabase
-        .from('compliances_with_status')
-        .select(
-          'compliance_id, certificate_no, certificate_name, category_name, category_id, department_name, department_id, owner_name, owner_id, renewal_frequency, last_renewed_date, next_renewal_date, days_remaining, status, notes'
-        );
-
-      if (!mounted) return;
-
-      if (result.error) {
-        console.error('Error loading compliances:', result.error);
-        setLoadError(result.error.message || 'Unable to load compliances');
-        setCompliances([]);
-      } else {
-        setCompliances((result.data ?? []) as ComplianceRow[]);
-      }
-
-      setIsLoading(false);
-    }
-
     channel
       .on('postgres_changes', { event: '*', schema: 'public', table: 'compliances' }, () => {
-        loadCompliances();
+        refreshCompliances();
       })
       .subscribe();
 
     loadOptions();
-    loadCompliances();
-    intervalId = window.setInterval(loadCompliances, 60000);
+    refreshCompliances();
+    intervalId = window.setInterval(refreshCompliances, 60000);
 
     return () => {
       mounted = false;
@@ -273,6 +280,12 @@ export default function DashboardClient() {
     }
     if (field === 'category_id' && extraLabel) {
       updatedRow.category_name = extraLabel;
+      const selectedCategory = categories.find((category) => category.value === value);
+      if (selectedCategory?.defaultOwnerId) {
+        const defaultOwner = owners.find((owner) => owner.value === selectedCategory.defaultOwnerId);
+        updatedRow.owner_id = selectedCategory.defaultOwnerId;
+        updatedRow.owner_name = defaultOwner?.label ?? '';
+      }
     }
     if (field === 'department_id' && extraLabel) {
       updatedRow.department_name = extraLabel;
@@ -283,6 +296,12 @@ export default function DashboardClient() {
     );
 
     const payload: Record<string, unknown> = { [field]: value };
+    if (updatedRow.owner_id !== undefined && field !== 'owner_id') {
+      payload.owner_id = updatedRow.owner_id;
+    }
+    if (updatedRow.category_id !== undefined && field !== 'category_id') {
+      payload.category_id = updatedRow.category_id;
+    }
 
     const { error } = await supabase.from('compliances').update(payload).eq('compliance_id', rowId);
 
@@ -293,6 +312,96 @@ export default function DashboardClient() {
     }
 
     return null;
+  };
+
+  const handleAddRow = async () => {
+    const supabase = getBrowserSupabaseClient();
+    const newCompliance: Partial<ComplianceRow> = {
+      certificate_no: 'TBD',
+      certificate_name: 'New compliance',
+      category_id: categories[0]?.value ?? null,
+      category_name: categories[0]?.label ?? '',
+      department_id: departments[0]?.value ?? null,
+      department_name: departments[0]?.label ?? '',
+      owner_id: categories[0]?.defaultOwnerId ?? owners[0]?.value ?? null,
+      owner_name: owners.find((owner) => owner.value === (categories[0]?.defaultOwnerId ?? owners[0]?.value))?.label ?? '',
+      renewal_frequency: null,
+      last_renewed_date: null,
+      next_renewal_date: null,
+      days_remaining: null,
+      status: 'normal',
+      notes: '',
+    };
+
+    const tempRow: TableRow = {
+      compliance_id: `new-${Date.now()}`,
+      ...newCompliance,
+      isNew: true,
+    } as TableRow;
+
+    setCompliances((current) => [tempRow, ...current]);
+
+    const { data, error } = await supabase.from('compliances').insert([{
+      certificate_name: newCompliance.certificate_name,
+      certificate_no: newCompliance.certificate_no,
+      category_id: newCompliance.category_id,
+      department_id: newCompliance.department_id,
+      owner_id: newCompliance.owner_id,
+      renewal_frequency: newCompliance.renewal_frequency,
+      last_renewed_date: newCompliance.last_renewed_date,
+      next_renewal_date: newCompliance.next_renewal_date,
+      notes: newCompliance.notes,
+    }]).select('compliance_id');
+
+    if (error) {
+      console.error('Error adding compliance row:', error);
+      setCompliances((current) => current.filter((row) => row.compliance_id !== tempRow.compliance_id));
+      return;
+    }
+
+    if (data?.[0]?.compliance_id) {
+      await refreshCompliances();
+    }
+  };
+
+  const handleDeleteRow = async (rowId: string) => {
+    const supabase = getBrowserSupabaseClient();
+    const originalRows = compliances;
+    setCompliances((current) => current.filter((row) => row.compliance_id !== rowId));
+
+    const { error } = await supabase.rpc('soft_delete_compliance', { compliance_id: rowId });
+    if (error) {
+      console.error('Error deleting compliance row:', error);
+      setCompliances(originalRows);
+    }
+  };
+
+  const handleDuplicateRow = async (rowId: string) => {
+    const supabase = getBrowserSupabaseClient();
+    const sourceRow = compliances.find((row) => row.compliance_id === rowId);
+    if (!sourceRow) return;
+
+    const payload: Partial<ComplianceRow> = {
+      certificate_name: sourceRow.certificate_name,
+      certificate_no: `${sourceRow.certificate_no || 'COPY'}-COPY`,
+      category_id: sourceRow.category_id,
+      department_id: sourceRow.department_id,
+      owner_id: sourceRow.owner_id,
+      renewal_frequency: sourceRow.renewal_frequency,
+      last_renewed_date: sourceRow.last_renewed_date,
+      next_renewal_date: sourceRow.next_renewal_date,
+      notes: sourceRow.notes,
+    };
+
+    const { data, error } = await supabase.from('compliances').insert([payload]).select('compliance_id');
+    if (error) {
+      console.error('Error duplicating compliance row:', error);
+      return;
+    }
+
+    if (data?.[0]?.compliance_id) {
+      await refreshCompliances();
+    }
   };
 
   const selectOptions = {
@@ -330,12 +439,23 @@ export default function DashboardClient() {
         </section>
 
         <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl shadow-slate-950/30">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Compliance table</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">Compliance records</h2>
-            </div>
-            <p className="text-sm text-slate-400">View is backed by compliances_with_status; editors may click editable cells.</p>
+<div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Compliance table</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">Compliance records</h2>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm text-slate-400">View is backed by compliances_with_status; editors may click editable cells.</p>
+                {isEditor ? (
+                  <button
+                    type="button"
+                    onClick={handleAddRow}
+                    className="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+                  >
+                    Add row
+                  </button>
+                ) : null}
+              </div>
           </div>
 
           {isLoading ? (
@@ -358,6 +478,7 @@ export default function DashboardClient() {
                     <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Days Remaining</th>
                     <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Status</th>
                     <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Notes</th>
+                    {isEditor ? <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Actions</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -454,6 +575,26 @@ export default function DashboardClient() {
                           onSave={handleSave}
                         />
                       </td>
+                      {isEditor ? (
+                        <td className="border-b border-slate-800 px-4 py-3">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateRow(row.compliance_id)}
+                              className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-200 transition hover:border-slate-500 hover:bg-slate-700"
+                            >
+                              Duplicate
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRow(row.compliance_id)}
+                              className="rounded-full border border-red-700 bg-red-950/60 px-3 py-1 text-xs text-red-300 transition hover:border-red-500 hover:bg-red-900"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
