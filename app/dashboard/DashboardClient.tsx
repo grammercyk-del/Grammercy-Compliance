@@ -36,6 +36,8 @@ export default function DashboardClient() {
   useEffect(() => {
     const supabase = getBrowserSupabaseClient();
     let mounted = true;
+    let intervalId: number | undefined;
+    const channel = supabase.channel('compliances_changes');
 
     async function loadCompliances() {
       setIsLoading(true);
@@ -60,10 +62,21 @@ export default function DashboardClient() {
       setIsLoading(false);
     }
 
+    channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'compliances' }, () => {
+        loadCompliances();
+      })
+      .subscribe();
+
     loadCompliances();
+    intervalId = window.setInterval(loadCompliances, 60000);
 
     return () => {
       mounted = false;
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
+      supabase.removeChannel(channel);
     };
   }, []);
 
