@@ -186,6 +186,7 @@ export default function DashboardClient() {
   const [departments, setDepartments] = useState<SelectOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const refreshCompliances = async () => {
     const supabase = getBrowserSupabaseClient();
@@ -364,6 +365,14 @@ export default function DashboardClient() {
     }
   };
 
+  const confirmDeleteRow = (rowId: string) => {
+    setDeleteTargetId(rowId);
+  };
+
+  const cancelDelete = () => {
+    setDeleteTargetId(null);
+  };
+
   const handleDeleteRow = async (rowId: string) => {
     const supabase = getBrowserSupabaseClient();
     const originalRows = compliances;
@@ -421,6 +430,34 @@ export default function DashboardClient() {
 
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-10">
+      {deleteTargetId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-slate-700 bg-slate-900 p-8 text-slate-100 shadow-2xl shadow-black/40">
+            <h3 className="text-xl font-semibold text-white">Archive this record?</h3>
+            <p className="mt-3 text-sm text-slate-300">It will be removed from the table.</p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={cancelDelete}
+                className="rounded-full border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500 hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!deleteTargetId) return;
+                  await handleDeleteRow(deleteTargetId);
+                  setDeleteTargetId(null);
+                }}
+                className="rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-400"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="mx-auto max-w-7xl space-y-6">
         <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-10 shadow-2xl shadow-slate-950/30">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -587,7 +624,7 @@ export default function DashboardClient() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteRow(row.compliance_id)}
+                              onClick={() => confirmDeleteRow(row.compliance_id)}
                               className="rounded-full border border-red-700 bg-red-950/60 px-3 py-1 text-xs text-red-300 transition hover:border-red-500 hover:bg-red-900"
                             >
                               Delete
