@@ -35,6 +35,16 @@ type AlertRow = {
   status: 'critical' | 'high' | 'medium' | string;
 };
 
+type OwnerRiskScore = {
+  owner_name: string;
+  total_active: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  normal_count: number;
+  risk_score: number;
+};
+
 type SelectOption = { value: string; label: string; defaultOwnerId?: string | null };
 
 type EditableCellProps = {
@@ -197,6 +207,7 @@ export default function DashboardClient() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [alertsCollapsed, setAlertsCollapsed] = useState({ critical: false, high: false, medium: false });
+  const [ownerRiskScores, setOwnerRiskScores] = useState<OwnerRiskScore[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOwner, setFilterOwner] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -238,6 +249,22 @@ export default function DashboardClient() {
     }
 
     setAlerts((result.data ?? []) as AlertRow[]);
+  };
+
+  const refreshOwnerRiskScores = async () => {
+    const supabase = getBrowserSupabaseClient();
+    const result = await supabase
+      .from('owner_risk_scores')
+      .select('owner_name, total_active, critical_count, high_count, medium_count, normal_count, risk_score');
+
+    if (result.error) {
+      console.error('Error loading owner risk scores:', result.error);
+      setOwnerRiskScores([]);
+      return;
+    }
+
+    const sortedData = ((result.data ?? []) as OwnerRiskScore[]).sort((a, b) => b.risk_score - a.risk_score);
+    setOwnerRiskScores(sortedData);
   };
 
   useEffect(() => {
@@ -282,15 +309,18 @@ export default function DashboardClient() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'compliances' }, () => {
         refreshCompliances();
         refreshAlerts();
+        refreshOwnerRiskScores();
       })
       .subscribe();
 
     loadOptions();
     refreshCompliances();
     refreshAlerts();
+    refreshOwnerRiskScores();
     intervalId = window.setInterval(() => {
       refreshCompliances();
       refreshAlerts();
+      refreshOwnerRiskScores();
     }, 60000);
 
     return () => {
@@ -934,6 +964,110 @@ export default function DashboardClient() {
               </table>
             </div>
           )}
+        </section>
+
+        {/* Owner Analytics Section */}
+        <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl shadow-slate-950/30">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Owner Analytics</p>
+              <h2 className="mt-2 text-2xl font-semibold text-white">Owner Risk Scores</h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-slate-400">Risk score range: 0.00 (low) to 3.00 (high)</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-950/80">
+            <table className="min-w-full border-collapse text-left text-sm text-slate-200">
+              <thead className="bg-slate-900/90 text-slate-400">
+                <tr>
+                  <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Owner Name</th>
+                  <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium text-center">Total Active</th>
+                  <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium text-center">
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /> Critical</span>
+                  </th>
+                  <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium text-center">
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500" /> High</span>
+                  </th>
+                  <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium text-center">
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Medium</span>
+                  </th>
+                  <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium text-center">
+                    <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Normal</span>
+                  </th>
+                  <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Risk Score</th>
+                  <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Risk Bar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ownerRiskScores.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="border-b border-slate-800 px-4 py-8 text-center text-slate-400">
+                      No owner risk data available
+                    </td>
+                  </tr>
+                ) : (
+                  ownerRiskScores.map((owner, index) => {
+                    const barWidth = Math.min((owner.risk_score / 3) * 100, 100);
+                    let barColorClass = 'bg-emerald-500';
+                    if (owner.risk_score >= 3.00) {
+                      barColorClass = 'bg-red-500';
+                    } else if (owner.risk_score >= 2.00) {
+                      barColorClass = 'bg-orange-500';
+                    } else if (owner.risk_score >= 1.00) {
+                      barColorClass = 'bg-amber-500';
+                    }
+
+                    return (
+                      <tr key={`${owner.owner_name}-${index}`} className="even:bg-slate-950/70 hover:bg-slate-900/80">
+                        <td className="border-b border-slate-800 px-4 py-3 font-semibold text-slate-100">{owner.owner_name || '—'}</td>
+                        <td className="border-b border-slate-800 px-4 py-3 text-center text-slate-300">{owner.total_active ?? 0}</td>
+                        <td className="border-b border-slate-800 px-4 py-3 text-center">
+                          <span className="inline-flex min-w-[2rem] items-center justify-center rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-semibold text-red-300">
+                            {owner.critical_count ?? 0}
+                          </span>
+                        </td>
+                        <td className="border-b border-slate-800 px-4 py-3 text-center">
+                          <span className="inline-flex min-w-[2rem] items-center justify-center rounded-full bg-orange-500/15 px-2 py-0.5 text-xs font-semibold text-orange-300">
+                            {owner.high_count ?? 0}
+                          </span>
+                        </td>
+                        <td className="border-b border-slate-800 px-4 py-3 text-center">
+                          <span className="inline-flex min-w-[2rem] items-center justify-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                            {owner.medium_count ?? 0}
+                          </span>
+                        </td>
+                        <td className="border-b border-slate-800 px-4 py-3 text-center">
+                          <span className="inline-flex min-w-[2rem] items-center justify-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-300">
+                            {owner.normal_count ?? 0}
+                          </span>
+                        </td>
+                        <td className="border-b border-slate-800 px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                            owner.risk_score >= 3.00 ? 'bg-red-500/15 text-red-300 ring-red-500/30' :
+                            owner.risk_score >= 2.00 ? 'bg-orange-500/15 text-orange-300 ring-orange-500/30' :
+                            owner.risk_score >= 1.00 ? 'bg-amber-500/15 text-amber-300 ring-amber-500/30' :
+                            'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30'
+                          }`}>
+                            {owner.risk_score?.toFixed(2) ?? '0.00'}
+                          </span>
+                        </td>
+                        <td className="border-b border-slate-800 px-4 py-3">
+                          <div className="h-2.5 w-full rounded-full bg-slate-800">
+                            <div
+                              className={`h-2.5 rounded-full ${barColorClass} transition-all duration-300`}
+                              style={{ width: `${barWidth}%` }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       </div>
     </main>
