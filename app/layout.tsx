@@ -1,22 +1,15 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
-
-const inter = Inter({ subsets: ['latin'] });
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'KIPL Compliance Intelligence Platform',
-  description: 'Real-time compliance tracking and management system',
+  title: 'Gramercy Dashboard',
+  description: 'Compliance dashboard for KIPL',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased">
         {children}
       </body>
     </html>
