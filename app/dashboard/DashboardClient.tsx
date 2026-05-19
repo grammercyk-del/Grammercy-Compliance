@@ -65,7 +65,7 @@ type EditableCellProps = {
   field: keyof ComplianceRow;
   value: string | number | null;
   isEditor: boolean | null;
-  type: 'text' | 'date' | 'select' | 'readonly';
+  type: 'text' | 'date' | 'select' | 'datalist' | 'readonly';
   options?: SelectOption[];
   onSave: (rowId: string, field: string, value: string, extraLabel?: string) => Promise<string | null>;
 };
@@ -193,6 +193,27 @@ function EditableCell({ row, field, value, isEditor, type, options, onSave }: Ed
                 </option>
               ))}
             </select>
+          )}
+          {type === 'datalist' && (
+            <div className="relative">
+              <input
+                ref={inputRef as React.RefObject<HTMLInputElement>}
+                type="text"
+                list={`datalist-${field}-${row.compliance_id}`}
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 outline-none ring-1 ring-transparent transition focus:border-slate-500 focus:ring-slate-500"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onBlur={handleSave}
+                onKeyDown={handleKeyDown}
+                disabled={saving}
+                placeholder="Type or select..."
+              />
+              <datalist id={`datalist-${field}-${row.compliance_id}`}>
+                {options?.map((option) => (
+                  <option key={option.value} value={option.label} />
+                ))}
+              </datalist>
+            </div>
           )}
         </div>
       ) : (
@@ -382,32 +403,68 @@ export default function DashboardClient() {
 
     const updatedRow: Partial<ComplianceRow> = { [field]: value } as Partial<ComplianceRow>;
 
-    if (field === 'owner_id' && extraLabel) {
-      updatedRow.owner_name = extraLabel;
-    }
-    if (field === 'category_id' && extraLabel) {
-      updatedRow.category_name = extraLabel;
-      const selectedCategory = categories.find((category) => category.value === value);
-      if (selectedCategory?.defaultOwnerId) {
-        const defaultOwner = owners.find((owner) => owner.value === selectedCategory.defaultOwnerId);
-        updatedRow.owner_id = selectedCategory.defaultOwnerId;
-        updatedRow.owner_name = defaultOwner?.label ?? '';
+    // For datalist fields, resolve text label to ID
+    if (field === 'category_id') {
+      // extraLabel is the typed text, value is the ID for select mode
+      const categoryName = extraLabel || '';
+      const matchedCategory = categories.find((c) => c.label.toLowerCase() === categoryName.toLowerCase());
+      if (matchedCategory) {
+        updatedRow.category_id = matchedCategory.value;
+        updatedRow.category_name = matchedCategory.label;
+        if (matchedCategory.defaultOwnerId) {
+          const defaultOwner = owners.find((o) => o.value === matchedCategory.defaultOwnerId);
+          updatedRow.owner_id = matchedCategory.defaultOwnerId;
+          updatedRow.owner_name = defaultOwner?.label ?? '';
+        }
+      } else {
+        // No match found, keep the text as category_name but no ID
+        updatedRow.category_name = categoryName;
+        updatedRow.category_id = null;
       }
     }
-    if (field === 'department_id' && extraLabel) {
-      updatedRow.department_name = extraLabel;
+    if (field === 'department_id') {
+      const deptName = extraLabel || '';
+      const matchedDept = departments.find((d) => d.label.toLowerCase() === deptName.toLowerCase());
+      if (matchedDept) {
+        updatedRow.department_id = matchedDept.value;
+        updatedRow.department_name = matchedDept.label;
+      } else {
+        updatedRow.department_name = deptName;
+        updatedRow.department_id = null;
+      }
+    }
+    if (field === 'renewal_frequency') {
+      updatedRow.renewal_frequency = extraLabel || value;
+    }
+    if (field === 'owner_id' && extraLabel) {
+      updatedRow.owner_name = extraLabel;
     }
 
     setCompliances((current) =>
       current.map((row) => (row.compliance_id === rowId ? { ...row, ...updatedRow } : row))
     );
 
-    const payload: Record<string, unknown> = { [field]: value };
+    const payload: Record<string, unknown> = {};
+    if (updatedRow.category_id !== undefined) {
+      payload.category_id = updatedRow.category_id;
+    }
+    if (updatedRow.category_name !== undefined && field === 'category_id') {
+      payload.category_name = updatedRow.category_name;
+    }
+    if (updatedRow.department_id !== undefined) {
+      payload.department_id = updatedRow.department_id;
+    }
+    if (updatedRow.department_name !== undefined && field === 'department_id') {
+      payload.department_name = updatedRow.department_name;
+    }
+    if (updatedRow.renewal_frequency !== undefined) {
+      payload.renewal_frequency = updatedRow.renewal_frequency;
+    }
     if (updatedRow.owner_id !== undefined && field !== 'owner_id') {
       payload.owner_id = updatedRow.owner_id;
     }
-    if (updatedRow.category_id !== undefined && field !== 'category_id') {
-      payload.category_id = updatedRow.category_id;
+    if (updatedRow.owner_name !== undefined && field === 'owner_id') {
+      payload.owner_name = updatedRow.owner_name;
     }
 
     const { error } = await supabase.from('compliances').update(payload).eq('compliance_id', rowId);
@@ -902,9 +959,9 @@ export default function DashboardClient() {
                         <EditableCell
                           row={row}
                           field="category_id"
-                          value={row.category_id}
+                          value={row.category_name}
                           isEditor={isEditor}
-                          type="select"
+                          type="datalist"
                           options={categories}
                           onSave={handleSave}
                         />
@@ -913,23 +970,73 @@ export default function DashboardClient() {
                         <EditableCell
                           row={row}
                           field="department_id"
-                          value={row.department_id}
+                          value={row.department_name}
                           isEditor={isEditor}
-                          type="select"
+                          type="datalist"
                           options={departments}
                           onSave={handleSave}
                         />
                       </td>
                       <td className="border-b border-slate-800 px-4 py-3">
-                        <EditableCell
-                          row={row}
-                          field="owner_id"
-                          value={row.owner_id}
-                          isEditor={isEditor}
-                          type="select"
-                          options={owners}
-                          onSave={handleSave}
-                        />
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <EditableCell
+                              row={row}
+                              field="owner_id"
+                              value={row.owner_id}
+                              isEditor={isEditor}
+                              type="select"
+                              options={owners}
+                              onSave={handleSave}
+                            />
+                          </div>
+                          {isEditor && (
+                            <div className="flex flex-col gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const name = prompt('Enter new owner name:');
+                                  if (!name || !name.trim()) return;
+                                  const supabase = getBrowserSupabaseClient();
+                                  const { data, error } = await supabase
+                                    .from('owners')
+                                    .insert([{ owner_name: name.trim() }])
+                                    .select('owner_id, owner_name');
+                                  if (error) {
+                                    alert('Error adding owner: ' + error.message);
+                                    return;
+                                  }
+                                  if (data?.[0]) {
+                                    setOwners((prev) => [...prev, { value: data[0].owner_id, label: data[0].owner_name }]);
+                                  }
+                                }}
+                                className="rounded-full border border-emerald-700 bg-emerald-950/60 px-2 py-1 text-xs text-emerald-300 transition hover:border-emerald-500 hover:bg-emerald-900"
+                                title="Add Owner"
+                              >
+                                + Add
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!row.owner_id) return;
+                                  if (!confirm(`Soft delete owner "${row.owner_name}"?`)) return;
+                                  const supabase = getBrowserSupabaseClient();
+                                  const { error } = await supabase.rpc('soft_delete_owner', { p_id: row.owner_id });
+                                  if (error) {
+                                    alert('Error deleting owner: ' + error.message);
+                                    return;
+                                  }
+                                  setOwners((prev) => prev.filter((o) => o.value !== row.owner_id));
+                                  await refreshCompliances();
+                                }}
+                                className="rounded-full border border-red-700 bg-red-950/60 px-2 py-1 text-xs text-red-300 transition hover:border-red-500 hover:bg-red-900"
+                                title="Delete Owner"
+                              >
+                                🗑 Del
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="border-b border-slate-800 px-4 py-3">
                         <EditableCell
@@ -937,7 +1044,7 @@ export default function DashboardClient() {
                           field="renewal_frequency"
                           value={row.renewal_frequency}
                           isEditor={isEditor}
-                          type="select"
+                          type="datalist"
                           options={selectOptions.renewal_frequency}
                           onSave={handleSave}
                         />
