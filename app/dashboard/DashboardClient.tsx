@@ -63,7 +63,7 @@ type EditableCellProps = {
   field: keyof ComplianceRow;
   value: string | number | null;
   isEditor: boolean | null;
-  type: 'text' | 'date' | 'select' | 'datalist' | 'readonly';
+  type: 'text' | 'date' | 'select' | 'datalist' | 'readonly' | 'textarea';
   options?: SelectOption[];
   onSave: (rowId: string, field: string, value: string, extraLabel?: string) => Promise<string | null>;
 };
@@ -193,11 +193,11 @@ function EditableCell({ row, field, value, isEditor, type, options, onSave }: Ed
             </select>
           )}
           {type === 'datalist' && (
-            <div className="relative">
+            <div className="relative flex items-center gap-1">
               <input
                 ref={inputRef as React.RefObject<HTMLInputElement>}
                 type="text"
-                list={`datalist-${field}-${row.compliance_id}`}
+                list={`datalist-${field}`}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 outline-none ring-1 ring-transparent transition focus:border-slate-500 focus:ring-slate-500"
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
@@ -206,12 +206,47 @@ function EditableCell({ row, field, value, isEditor, type, options, onSave }: Ed
                 disabled={saving}
                 placeholder="Type or select..."
               />
-              <datalist id={`datalist-${field}-${row.compliance_id}`}>
+              <datalist id={`datalist-${field}`}> 
                 {options?.map((option) => (
                   <option key={option.value} value={option.label} />
                 ))}
               </datalist>
+              {isEditor && (
+                <button
+                  type="button"
+                  className="ml-1 rounded-full border border-red-700 bg-red-950/60 px-2 py-1 text-xs text-red-300 transition hover:border-red-500 hover:bg-red-900"
+                  title="Delete value"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    const label = draft.trim();
+                    if (!label) return;
+                    if (!confirm(`Delete '${label}' from lookup table?`)) return;
+                    const supabase = getBrowserSupabaseClient();
+                    let table = field === 'category_id' ? 'categories' : field === 'department_id' ? 'departments' : null;
+                    if (!table) return;
+                    const { error } = await supabase
+                      .from(table)
+                      .delete()
+                      .eq('name', label);
+                    if (error) alert('Error deleting: ' + error.message);
+                  }}
+                >
+                  🗑
+                </button>
+              )}
             </div>
+          )}
+          {type === 'textarea' && (
+            <textarea
+              ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 outline-none ring-1 ring-transparent transition focus:border-slate-500 focus:ring-slate-500"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onBlur={handleSave}
+              rows={2}
+              disabled={saving}
+              placeholder="Remarks..."
+            />
           )}
         </div>
       ) : (
@@ -335,9 +370,9 @@ export default function DashboardClient() {
 
     async function loadOptions() {
       const [ownersResult, categoriesResult, departmentsResult] = await Promise.all([
-        supabase.from('active_owners').select('owner_id, owner_name'),
-        supabase.from('active_categories').select('category_id, category_name, default_owner_id'),
-        supabase.from('active_departments').select('department_id, department_name'),
+        supabase.from('owners').select('id, name'),
+        supabase.from('categories').select('id, name'),
+        supabase.from('departments').select('id, name'),
       ]);
 
       if (!mounted) return;
@@ -345,23 +380,19 @@ export default function DashboardClient() {
       if (ownersResult.error) {
         console.error('Error loading owners:', ownersResult.error);
       } else {
-        setOwners((ownersResult.data ?? []).map((item: any) => ({ value: item.owner_id, label: item.owner_name })));
+        setOwners((ownersResult.data ?? []).map((item: any) => ({ value: item.id, label: item.name })));
       }
 
       if (categoriesResult.error) {
         console.error('Error loading categories:', categoriesResult.error);
       } else {
-        setCategories((categoriesResult.data ?? []).map((item: any) => ({
-          value: item.category_id,
-          label: item.category_name,
-          defaultOwnerId: item.default_owner_id,
-        })));
+        setCategories((categoriesResult.data ?? []).map((item: any) => ({ value: item.id, label: item.name })));
       }
 
       if (departmentsResult.error) {
         console.error('Error loading departments:', departmentsResult.error);
       } else {
-        setDepartments((departmentsResult.data ?? []).map((item: any) => ({ value: item.department_id, label: item.department_name })));
+        setDepartments((departmentsResult.data ?? []).map((item: any) => ({ value: item.id, label: item.name })));
       }
     }
 
@@ -400,79 +431,75 @@ export default function DashboardClient() {
     }
 
     const updatedRow: Partial<ComplianceRow> = { [field]: value } as Partial<ComplianceRow>;
+    const payload: Record<string, unknown> = {};
 
-    // For datalist fields, resolve text label to ID
-    if (field === 'category_id') {
-      // extraLabel is the typed text, value is the ID for select mode
-      const categoryName = extraLabel || '';
-      const matchedCategory = categories.find((c) => c.label.toLowerCase() === categoryName.toLowerCase());
-      if (matchedCategory) {
-        updatedRow.category_id = matchedCategory.value;
-        updatedRow.category_name = matchedCategory.label;
-        if (matchedCategory.defaultOwnerId) {
-          const defaultOwner = owners.find((o) => o.value === matchedCategory.defaultOwnerId);
-          updatedRow.owner_id = matchedCategory.defaultOwnerId;
-          updatedRow.owner_name = defaultOwner?.label ?? '';
+    // Handle lookup fields
+    if (field === 'category_id' || field === 'department_id') {
+      const lookup = field === 'category_id' ? categories : departments;
+      let label = value;
+      let id = lookup.find((c) => c.label.toLowerCase() === label.toLowerCase())?.value;
+      if (!id) {
+        // Insert new value
+        const table = field === 'category_id' ? 'categories' : 'departments';
+        const { data, error } = await supabase.from(table).insert([{ name: label }]).select('id');
+        if (error || !data?.[0]?.id) {
+          return error?.message || 'Failed to insert new value';
         }
-      } else {
-        // No match found, keep the text as category_name but no ID
-        updatedRow.category_name = categoryName;
-        updatedRow.category_id = null;
+        id = data[0].id;
+        if (field === 'category_id') setCategories((prev) => [...prev, { value: id, label }]);
+        else setDepartments((prev) => [...prev, { value: id, label }]);
       }
-    }
-    if (field === 'department_id') {
-      const deptName = extraLabel || '';
-      const matchedDept = departments.find((d) => d.label.toLowerCase() === deptName.toLowerCase());
-      if (matchedDept) {
-        updatedRow.department_id = matchedDept.value;
-        updatedRow.department_name = matchedDept.label;
-      } else {
-        updatedRow.department_name = deptName;
-        updatedRow.department_id = null;
+      updatedRow[field] = id;
+      payload[field] = id;
+    } else if (field === 'owner_id') {
+      let id = owners.find((o) => o.label.toLowerCase() === value.toLowerCase())?.value;
+      if (!id) {
+        const { data, error } = await supabase.from('owners').insert([{ name: value }]).select('id');
+        if (error || !data?.[0]?.id) {
+          return error?.message || 'Failed to insert new owner';
+        }
+        id = data[0].id;
+        setOwners((prev) => [...prev, { value: id, label: value }]);
       }
-    }
-    if (field === 'renewal_frequency') {
-      updatedRow.renewal_frequency = extraLabel || value;
-    }
-    if (field === 'owner_id' && extraLabel) {
-      updatedRow.owner_name = extraLabel;
+      updatedRow.owner_id = id;
+      payload.owner_id = id;
+    } else if (field === 'frequency') {
+      updatedRow.frequency = value;
+      payload.frequency = value;
+      if (value === 'Custom' && typeof extraLabel === 'string') {
+        payload.frequency_months = Number(extraLabel);
+        updatedRow.frequency_months = Number(extraLabel);
+      } else {
+        const freqMap: Record<string, number> = {
+          'Monthly': 1,
+          'Quarterly': 3,
+          'Half-Yearly': 6,
+          'Annual': 12,
+          'Bi-Annual': 24,
+          'Every 3 years': 36,
+          'Every 5 years': 60,
+        };
+        payload.frequency_months = freqMap[value] || null;
+        updatedRow.frequency_months = freqMap[value] || null;
+      }
+    } else if (field === 'remarks') {
+      updatedRow.remarks = value;
+      payload.remarks = value;
+    } else {
+      updatedRow[field] = value;
+      payload[field] = value;
     }
 
     setCompliances((current) =>
       current.map((row) => (row.compliance_id === rowId ? { ...row, ...updatedRow } : row))
     );
 
-    const payload: Record<string, unknown> = {};
-    if (updatedRow.category_id !== undefined) {
-      payload.category_id = updatedRow.category_id;
-    }
-    if (updatedRow.category_name !== undefined && field === 'category_id') {
-      payload.category_name = updatedRow.category_name;
-    }
-    if (updatedRow.department_id !== undefined) {
-      payload.department_id = updatedRow.department_id;
-    }
-    if (updatedRow.department_name !== undefined && field === 'department_id') {
-      payload.department_name = updatedRow.department_name;
-    }
-    if (updatedRow.renewal_frequency !== undefined) {
-      payload.renewal_frequency = updatedRow.renewal_frequency;
-    }
-    if (updatedRow.owner_id !== undefined && field !== 'owner_id') {
-      payload.owner_id = updatedRow.owner_id;
-    }
-    if (updatedRow.owner_name !== undefined && field === 'owner_id') {
-      payload.owner_name = updatedRow.owner_name;
-    }
-
     const { error } = await supabase.from('compliances').update(payload).eq('compliance_id', rowId);
-
     if (error) {
       console.error('Error saving compliance:', error);
       setCompliances((current) => current.map((row) => (row.compliance_id === rowId ? originalRow : row)));
       return error.message || 'Unable to save changes';
     }
-
     return null;
   };
 
@@ -931,6 +958,7 @@ export default function DashboardClient() {
                     <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Department</th>
                     <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Owner</th>
                     <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Frequency</th>
+                    <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Remarks</th>
                     <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Last Renewed</th>
                     <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Next Renewal</th>
                     <th className="whitespace-nowrap border-b border-slate-800 px-4 py-3 font-medium">Days Remaining</th>
@@ -957,7 +985,7 @@ export default function DashboardClient() {
                         <EditableCell
                           row={row}
                           field="category_id"
-                          value={row.category_name}
+                          value={categories.find((c) => c.value === row.category_id)?.label || ''}
                           isEditor={isEditor}
                           type="datalist"
                           options={categories}
@@ -968,7 +996,7 @@ export default function DashboardClient() {
                         <EditableCell
                           row={row}
                           field="department_id"
-                          value={row.department_name}
+                          value={departments.find((d) => d.value === row.department_id)?.label || ''}
                           isEditor={isEditor}
                           type="datalist"
                           options={departments}
@@ -976,74 +1004,48 @@ export default function DashboardClient() {
                         />
                       </td>
                       <td className="border-b border-slate-800 px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 min-w-0">
-                            <EditableCell
-                              row={row}
-                              field="owner_id"
-                              value={row.owner_id}
-                              isEditor={isEditor}
-                              type="select"
-                              options={owners}
-                              onSave={handleSave}
-                            />
-                          </div>
-                          {isEditor && (
-                            <div className="flex flex-col gap-1 shrink-0">
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const name = prompt('Enter new owner name:');
-                                  if (!name || !name.trim()) return;
-                                  const supabase = getBrowserSupabaseClient();
-                                  const { data, error } = await supabase
-                                    .from('owners')
-                                    .insert([{ owner_name: name.trim() }])
-                                    .select('owner_id, owner_name');
-                                  if (error) {
-                                    alert('Error adding owner: ' + error.message);
-                                    return;
-                                  }
-                                  if (data?.[0]) {
-                                    setOwners((prev) => [...prev, { value: data[0].owner_id, label: data[0].owner_name }]);
-                                  }
-                                }}
-                                className="rounded-full border border-emerald-700 bg-emerald-950/60 px-2 py-1 text-xs text-emerald-300 transition hover:border-emerald-500 hover:bg-emerald-900"
-                                title="Add Owner"
-                              >
-                                + Add
-                              </button>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (!row.owner_id) return;
-                                  if (!confirm(`Soft delete owner "${row.owner_name}"?`)) return;
-                                  const supabase = getBrowserSupabaseClient();
-                                  const { error } = await supabase.rpc('soft_delete_owner', { p_id: row.owner_id });
-                                  if (error) {
-                                    alert('Error deleting owner: ' + error.message);
-                                    return;
-                                  }
-                                  setOwners((prev) => prev.filter((o) => o.value !== row.owner_id));
-                                  await refreshCompliances();
-                                }}
-                                className="rounded-full border border-red-700 bg-red-950/60 px-2 py-1 text-xs text-red-300 transition hover:border-red-500 hover:bg-red-900"
-                                title="Delete Owner"
-                              >
-                                🗑 Del
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        <EditableCell
+                          row={row}
+                          field="owner_id"
+                          value={owners.find((o) => o.value === row.owner_id)?.label || ''}
+                          isEditor={isEditor}
+                          type="datalist"
+                          options={owners}
+                          onSave={handleSave}
+                        />
+                      </td>
+                      <td className="border-b border-slate-800 px-4 py-3">
+                        <select
+                          className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 outline-none ring-1 ring-transparent transition focus:border-slate-500 focus:ring-slate-500"
+                          value={row.frequency || ''}
+                          disabled={!isEditor}
+                          onChange={async (e) => {
+                            const val = e.target.value;
+                            let months = '';
+                            if (val === 'Custom') {
+                              months = prompt('Enter custom frequency in months:', row.frequency_months?.toString() || '') || '';
+                            }
+                            await handleSave(row.compliance_id, 'frequency', val, months);
+                          }}
+                        >
+                          <option value="">Choose…</option>
+                          <option value="Monthly">Monthly (1)</option>
+                          <option value="Quarterly">Quarterly (3)</option>
+                          <option value="Half-Yearly">Half-Yearly (6)</option>
+                          <option value="Annual">Annual (12)</option>
+                          <option value="Bi-Annual">Bi-Annual (24)</option>
+                          <option value="Every 3 years">Every 3 years (36)</option>
+                          <option value="Every 5 years">Every 5 years (60)</option>
+                          <option value="Custom">Custom…</option>
+                        </select>
                       </td>
                       <td className="border-b border-slate-800 px-4 py-3">
                         <EditableCell
                           row={row}
-                          field="renewal_frequency"
-                          value={row.renewal_frequency}
+                          field="remarks"
+                          value={row.remarks}
                           isEditor={isEditor}
-                          type="datalist"
-                          options={selectOptions.renewal_frequency}
+                          type="textarea"
                           onSave={handleSave}
                         />
                       </td>
