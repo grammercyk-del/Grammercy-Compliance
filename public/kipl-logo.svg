@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Green circular background -->
+  <circle cx="100" cy="100" r="95" fill="#047857" opacity="0.1"/>
+  <circle cx="100" cy="100" r="90" fill="#059669" opacity="0.15"/>
+  
+  <!-- Stylized 'K' in green -->
+  <g fill="#047857">
+    <path d="M 60 50 L 75 50 L 75 95 L 110 50 L 130 50 L 85 105 L 135 150 L 113 150 L 75 110 L 75 150 L 60 150 Z"/>
+  </g>
+  
+  <!-- Text "KIPL" -->
+  <text x="100" y="170" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#047857">
+    KIPL
+  </text>
+</svg>

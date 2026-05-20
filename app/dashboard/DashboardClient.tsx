@@ -412,19 +412,15 @@ export default function DashboardClient() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'compliances' }, () => {
         refreshCompliances();
         refreshAlerts();
-        refreshOwnerRiskScores();
       })
       .subscribe();
 
     loadOptions();
-    refreshCompliances().then(() => {
-      refreshOwnerRiskScores();
-    });
+    refreshCompliances();
     refreshAlerts();
     intervalId = window.setInterval(() => {
       refreshCompliances();
       refreshAlerts();
-      refreshOwnerRiskScores();
     }, 60000);
 
     return () => {
@@ -435,6 +431,10 @@ export default function DashboardClient() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  useEffect(() => {
+    refreshOwnerRiskScores();
+  }, [compliances, owners]);
 
   const handleSave = async (rowId: string, field: string, value: string, extraLabel?: string) => {
     const supabase = getBrowserSupabaseClient();
@@ -523,7 +523,7 @@ export default function DashboardClient() {
       certificate_name: 'New compliance',
       category_id: categories[0]?.value ?? null,
       department_id: departments[0]?.value ?? null,
-      owner_id: categories[0]?.defaultOwnerId ?? owners[0]?.value ?? null,
+      owner_id: owners[0]?.value ?? null,
       last_renewed_date: null,
       next_renewal_date: null,
       days_remaining: null,
@@ -775,12 +775,28 @@ export default function DashboardClient() {
               <h1 className="mt-2 text-3xl font-semibold text-gray-800">Welcome back, compliance user</h1>
               <p className="mt-2 text-sm text-gray-500">Role: {isEditor === null ? 'Loading...' : isEditor ? 'Editor' : 'Viewer'}</p>
             </div>
-            <Link
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-100"
-              href="/login"
-            >
-              Manage session
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={exportCSV}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100"
+              >
+                📥 Export CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => setDarkMode(!darkMode)}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100"
+              >
+                {darkMode ? '☀️ Light' : '🌙 Dark'}
+              </button>
+              <Link
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100"
+                href="/login"
+              >
+                Manage session
+              </Link>
+            </div>
           </div>
         </section>
 

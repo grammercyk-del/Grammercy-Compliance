@@ -37,10 +37,9 @@ export default function LoginPage() {
       <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
         <div className="text-center mb-8">
           <img
-            src="/kipl-logo.png"
+            src="/kipl-logo.svg"
             alt="KIPL Logo"
             className="mx-auto h-16 w-auto mb-4"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
           <h1 className="text-2xl font-bold text-green-800">
             Kesari Infrabuild Pvt. Ltd.

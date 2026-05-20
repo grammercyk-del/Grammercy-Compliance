@@ -6,10 +6,9 @@ export default function HomePage() {
       <div className="bg-white p-10 rounded-2xl shadow-md text-center max-w-md w-full">
 
         <img
-          src="/kipl-logo.png"
+          src="/kipl-logo.svg"
           alt="KIPL Logo"
           className="mx-auto mb-4 h-20 w-auto"
-          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
         />
 
         <h1 className="text-2xl font-bold text-green-800">
