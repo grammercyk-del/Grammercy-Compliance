@@ -69,10 +69,11 @@ type EditableCellProps = {
 };
 
 const statusClasses: Record<string, string> = {
+  normal: 'bg-green-100 text-green-700 ring-green-300',
+  due_soon: 'bg-yellow-100 text-yellow-700 ring-yellow-300',
   critical: 'bg-red-100 text-red-700 ring-red-300',
-  high: 'bg-orange-100 text-orange-700 ring-orange-300',
-  medium: 'bg-amber-100 text-amber-700 ring-amber-300',
-  normal: 'bg-emerald-100 text-emerald-700 ring-emerald-300',
+  expired: 'bg-red-200 text-red-800 ring-red-400',
+  unknown: 'bg-gray-100 text-gray-600 ring-gray-300',
 };
 
 function EditableCell({ row, field, value, isEditor, type, options, onSave }: EditableCellProps) {
@@ -672,16 +673,16 @@ export default function DashboardClient() {
       textClass: 'text-red-700',
     },
     high: {
-      label: '🟠 High',
-      ringClass: 'ring-orange-300',
-      bgClass: 'bg-orange-50',
-      textClass: 'text-orange-700',
+      label: '🟡 Due Soon',
+      ringClass: 'ring-yellow-300',
+      bgClass: 'bg-yellow-50',
+      textClass: 'text-yellow-700',
     },
     medium: {
-      label: '🟡 Medium',
-      ringClass: 'ring-amber-300',
-      bgClass: 'bg-amber-50',
-      textClass: 'text-amber-700',
+      label: '🔴 Expired',
+      ringClass: 'ring-red-400',
+      bgClass: 'bg-red-200',
+      textClass: 'text-red-800',
     },
   };
 
