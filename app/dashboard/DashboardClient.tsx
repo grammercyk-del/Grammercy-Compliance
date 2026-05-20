@@ -654,13 +654,14 @@ export default function DashboardClient() {
 
   const totalCertifications = filteredCompliances.length;
   const normalCount = filteredCompliances.filter((row) => row.status === 'normal').length;
-  const dueSoonCount = filteredCompliances.filter((row) => row.status === 'high' || row.status === 'medium').length;
+  const dueSoonCount = filteredCompliances.filter((row) => row.status === 'due_soon').length;
   const criticalCount = filteredCompliances.filter((row) => row.status === 'critical').length;
+  const expiredCount = filteredCompliances.filter((row) => row.status === 'expired').length;
 
   const alertGroups = {
     critical: alerts.filter((alert) => alert.status?.toLowerCase() === 'critical'),
-    high: alerts.filter((alert) => alert.status?.toLowerCase() === 'high'),
-    medium: alerts.filter((alert) => alert.status?.toLowerCase() === 'medium'),
+    high: alerts.filter((alert) => alert.status?.toLowerCase() === 'due_soon'),
+    medium: alerts.filter((alert) => alert.status?.toLowerCase() === 'expired'),
   };
 
   const totalAlerts = alerts.length;
