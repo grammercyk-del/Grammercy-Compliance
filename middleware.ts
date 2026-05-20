@@ -1,35 +1,28 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  const supabase = createSupabaseServerClient(res);
-
-  if (supabase) {
-    await supabase.auth.refreshSession();
-  }
-
-  const {
-    data: { session },
-  } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
-
+export function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
+  
+  // Check for auth token in cookies (lightweight check, no server imports)
+  const token = req.cookies.get('sb-auth-token')?.value;
+  const hasSession = !!token;
+
   const isProtectedRoute = pathname.startsWith('/dashboard');
   const isLoginRoute = pathname === '/login';
 
-  if (!session && isProtectedRoute) {
+  if (!hasSession && isProtectedRoute) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/login';
     redirectUrl.search = `redirectedFrom=${encodeURIComponent(pathname)}`;
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (session && isLoginRoute) {
+  if (hasSession && isLoginRoute) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
-  return res;
+  return NextResponse.next();
 }
 
 export const config = {
