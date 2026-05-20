@@ -238,7 +238,7 @@ function EditableCell({ row, field, value, isEditor, type, options, onSave }: Ed
           )}
           {type === 'textarea' && (
             <textarea
-              ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+              ref={inputRef as unknown as React.RefObject<HTMLTextAreaElement>}
               className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 outline-none ring-1 ring-transparent transition focus:border-slate-500 focus:ring-slate-500"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -446,8 +446,8 @@ export default function DashboardClient() {
           return error?.message || 'Failed to insert new value';
         }
         id = data[0].id;
-        if (field === 'category_id') setCategories((prev) => [...prev, { value: id, label }]);
-        else setDepartments((prev) => [...prev, { value: id, label }]);
+        if (field === 'category_id') setCategories((prev) => [...prev, { value: id!, label }]);
+        else setDepartments((prev) => [...prev, { value: id!, label }]);
       }
       updatedRow[field] = id;
       payload[field] = id;
@@ -459,7 +459,7 @@ export default function DashboardClient() {
           return error?.message || 'Failed to insert new owner';
         }
         id = data[0].id;
-        setOwners((prev) => [...prev, { value: id, label: value }]);
+        setOwners((prev) => [...prev, { value: id!, label: value }]);
       }
       updatedRow.owner_id = id;
       payload.owner_id = id;
@@ -486,8 +486,8 @@ export default function DashboardClient() {
       updatedRow.remarks = value;
       payload.remarks = value;
     } else {
-      updatedRow[field] = value;
-      payload[field] = value;
+      (updatedRow as any)[field] = value;
+      (payload as any)[field] = value;
     }
 
     setCompliances((current) =>
@@ -509,17 +509,12 @@ export default function DashboardClient() {
       certificate_no: 'TBD',
       certificate_name: 'New compliance',
       category_id: categories[0]?.value ?? null,
-      category_name: categories[0]?.label ?? '',
       department_id: departments[0]?.value ?? null,
-      department_name: departments[0]?.label ?? '',
       owner_id: categories[0]?.defaultOwnerId ?? owners[0]?.value ?? null,
-      owner_name: owners.find((owner) => owner.value === (categories[0]?.defaultOwnerId ?? owners[0]?.value))?.label ?? '',
-      renewal_frequency: null,
       last_renewed_date: null,
       next_renewal_date: null,
       days_remaining: null,
       status: 'normal',
-      notes: '',
     };
 
     const tempRow: TableRow = {
@@ -535,10 +530,8 @@ export default function DashboardClient() {
       category_id: newCompliance.category_id,
       department_id: newCompliance.department_id,
       owner_id: newCompliance.owner_id,
-      renewal_frequency: newCompliance.renewal_frequency,
       last_renewed_date: newCompliance.last_renewed_date,
       next_renewal_date: newCompliance.next_renewal_date,
-      notes: newCompliance.notes,
     }]).select('compliance_id');
 
     if (error) {
@@ -583,10 +576,8 @@ export default function DashboardClient() {
       category_id: sourceRow.category_id,
       department_id: sourceRow.department_id,
       owner_id: sourceRow.owner_id,
-      renewal_frequency: sourceRow.renewal_frequency,
       last_renewed_date: sourceRow.last_renewed_date,
       next_renewal_date: sourceRow.next_renewal_date,
-      notes: sourceRow.notes,
     };
 
     const { data, error } = await supabase.from('compliances').insert([payload]).select('compliance_id');
@@ -1078,8 +1069,8 @@ export default function DashboardClient() {
                       <td className="border-b border-slate-800 px-4 py-3">
                         <EditableCell
                           row={row}
-                          field="notes"
-                          value={row.notes}
+                          field={"remarks" as keyof ComplianceRow}
+                          value={(row as any).notes}
                           isEditor={isEditor}
                           type="text"
                           onSave={handleSave}
