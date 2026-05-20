@@ -559,7 +559,10 @@ export default function DashboardClient() {
     const originalRows = compliances;
     setCompliances((current) => current.filter((row) => row.compliance_id !== rowId));
 
-    const { error } = await supabase.rpc('soft_delete_compliance', { compliance_id: rowId });
+    const { error } = await supabase
+      .from('compliances')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('compliance_id', rowId);
     if (error) {
       console.error('Error deleting compliance row:', error);
       setCompliances(originalRows);
