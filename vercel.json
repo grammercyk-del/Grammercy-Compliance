@@ -1,0 +1,10 @@
+{
+  "deploymentProtection": {
+    "preview": {
+      "access": "public"
+    },
+    "production": {
+      "access": "public"
+    }
+  }
+}
