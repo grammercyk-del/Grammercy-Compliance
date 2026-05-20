@@ -9,18 +9,16 @@ type ComplianceRow = {
   compliance_id: string;
   certificate_no: string;
   certificate_name: string;
-  category_name: string;
   category_id: string | null;
-  department_name: string;
   department_id: string | null;
-  owner_name: string;
   owner_id: string | null;
-  renewal_frequency: string | null;
+  frequency: string | null;
+  frequency_months: number | null;
+  remarks: string | null;
   last_renewed_date: string | null;
   next_renewal_date: string | null;
   days_remaining: number | null;
   status: 'critical' | 'high' | 'medium' | 'normal' | string;
-  notes: string | null;
 };
 
 type TableRow = ComplianceRow & {
@@ -259,7 +257,7 @@ export default function DashboardClient() {
     const result = await supabase
       .from('compliances_with_status')
       .select(
-        'compliance_id, certificate_no, certificate_name, category_name, category_id, department_name, department_id, owner_name, owner_id, renewal_frequency, last_renewed_date, next_renewal_date, days_remaining, status, notes'
+        'compliance_id, certificate_no, certificate_name, category_id, department_id, owner_id, frequency, frequency_months, remarks, last_renewed_date, next_renewal_date, days_remaining, status'
       );
 
     if (result.error) {
