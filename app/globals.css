@@ -24,3 +24,13 @@ body {
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
 }
+
+/* Ensure form elements have visible text in light theme */
+input, textarea, select {
+  color: #1F2937;
+  background: #FFFFFF;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #9CA3AF;
+}
