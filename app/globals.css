@@ -3,7 +3,16 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  --bg: #F5F8F4;
+  --surface: #FFFFFF;
+  --border: #E2EAE0;
+
+  --primary: #2E7D32;
+  --primary-dark: #1B5E20;
+  --primary-light: #E8F5E9;
+
+  --text-primary: #1A1F1A;
+  --text-secondary: #5A6B5A;
 }
 
 html {
@@ -11,5 +20,7 @@ html {
 }
 
 body {
-  @apply bg-slate-950 text-slate-100;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
 }

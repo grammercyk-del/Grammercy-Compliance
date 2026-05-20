@@ -33,20 +33,35 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6">
-      <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-xl shadow-slate-950/30">
-        <h1 className="text-3xl font-semibold text-white">Sign in</h1>
-        <p className="mt-2 text-slate-400">Enter your email to receive a magic link.</p>
+    <main className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F8F4' }}>
+      <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
+        <div className="text-center mb-8">
+          <img
+            src="/kipl-logo.png"
+            alt="KIPL Logo"
+            className="mx-auto h-16 w-auto mb-4"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+          <h1 className="text-2xl font-bold text-green-800">
+            Kesari Infrabuild Pvt. Ltd.
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Compliance dashboard by KIPL for Grammercy
+          </p>
+        </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <h2 className="text-xl font-semibold text-gray-800">Sign in</h2>
+        <p className="mt-1 text-sm text-gray-500">Enter your email to receive a magic link.</p>
+
+        <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
           <label className="block">
-            <span className="text-sm text-slate-400">Email address</span>
+            <span className="text-sm text-gray-600">Email address</span>
             <input
               type="email"
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-800 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
               placeholder="you@example.com"
             />
           </label>
@@ -54,14 +69,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex w-full justify-center rounded-2xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full justify-center rounded-lg bg-green-700 px-4 py-2.5 font-semibold text-white transition hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? 'Sending...' : 'Send magic link'}
           </button>
         </form>
 
         {message ? (
-          <p className="mt-6 rounded-2xl bg-slate-800/90 p-4 text-sm text-slate-200">{message}</p>
+          <p className="mt-5 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-800">{message}</p>
         ) : null}
       </div>
     </main>
