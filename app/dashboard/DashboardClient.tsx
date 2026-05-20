@@ -949,19 +949,19 @@ export default function DashboardClient() {
               <table className="min-w-full border-collapse text-left text-sm text-gray-700">
                 <thead className="bg-gray-50 text-gray-500">
                   <tr>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Certificate No</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Certificate Name</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Category</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Department</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Owner</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Frequency</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Remarks</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Last Renewed</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Next Renewal</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Days Remaining</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Status</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Notes</th>
-                    {isEditor ? <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium">Actions</th> : null}
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[140px]">Certificate No</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[180px]">Certificate Name</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[150px]">Category</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[150px]">Department</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[150px]">Owner</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[130px]">Frequency</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[200px]">Remarks</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[140px]">Last Renewed</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[140px]">Next Renewal</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[120px]">Days Remaining</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[100px]">Status</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[140px]">Notes</th>
+                    {isEditor ? <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[120px]">Actions</th> : null}
                   </tr>
                 </thead>
                 <tbody>
