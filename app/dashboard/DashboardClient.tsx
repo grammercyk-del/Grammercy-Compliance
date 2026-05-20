@@ -323,20 +323,29 @@ export default function DashboardClient() {
     setAlerts((result.data ?? []) as AlertRow[]);
   };
 
-  const refreshOwnerRiskScores = async () => {
-    const supabase = getBrowserSupabaseClient();
-    const result = await supabase
-      .from('owner_risk_scores')
-      .select('owner_name, total_active, critical_count, high_count, medium_count, normal_count, risk_score');
+  const refreshOwnerRiskScores = () => {
+    const ownerMap: Record<string, { owner_name: string; total_active: number; critical_count: number; high_count: number; medium_count: number; normal_count: number; risk_score: number }> = {};
 
-    if (result.error) {
-      console.error('Error loading owner risk scores:', result.error);
-      setOwnerRiskScores([]);
-      return;
-    }
+    compliances.forEach((row) => {
+      if (!row.owner_id) return;
+      const ownerName = owners.find((o) => o.value === row.owner_id)?.label || 'Unknown';
+      if (!ownerMap[row.owner_id]) {
+        ownerMap[row.owner_id] = { owner_name: ownerName, total_active: 0, critical_count: 0, high_count: 0, medium_count: 0, normal_count: 0, risk_score: 0 };
+      }
+      const o = ownerMap[row.owner_id];
+      o.total_active += 1;
+      if (row.status === 'critical') o.critical_count += 1;
+      else if (row.status === 'due_soon') o.medium_count += 1;
+      else if (row.status === 'expired') o.high_count += 1;
+      else if (row.status === 'normal') o.normal_count += 1;
+    });
 
-    const sortedData = ((result.data ?? []) as OwnerRiskScore[]).sort((a, b) => b.risk_score - a.risk_score);
-    setOwnerRiskScores(sortedData);
+    const scores = Object.values(ownerMap).map((o) => ({
+      ...o,
+      risk_score: Number(((o.critical_count * 3 + o.high_count * 2 + o.medium_count * 1) / Math.max(o.total_active, 1)).toFixed(2)),
+    })).sort((a, b) => b.risk_score - a.risk_score);
+
+    setOwnerRiskScores(scores);
   };
 
   const loadAuditHistory = async () => {
