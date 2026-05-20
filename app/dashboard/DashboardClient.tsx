@@ -285,6 +285,7 @@ export default function DashboardClient() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [darkMode, setDarkMode] = useState(false);
 
   const refreshCompliances = async () => {
     const supabase = getBrowserSupabaseClient();
@@ -416,9 +417,10 @@ export default function DashboardClient() {
       .subscribe();
 
     loadOptions();
-    refreshCompliances();
+    refreshCompliances().then(() => {
+      refreshOwnerRiskScores();
+    });
     refreshAlerts();
-    refreshOwnerRiskScores();
     intervalId = window.setInterval(() => {
       refreshCompliances();
       refreshAlerts();
@@ -696,6 +698,36 @@ export default function DashboardClient() {
     },
   };
 
+  const exportCSV = () => {
+    const headers = [
+      "Certificate No", "Certificate Name", "Category", "Department", "Owner",
+      "Frequency", "Remarks", "Last Renewed", "Next Renewal", "Days Remaining", "Status"
+    ];
+
+    const data = filteredCompliances.map(r => [
+      r.certificate_no,
+      r.certificate_name,
+      categories.find(c => c.value === r.category_id)?.label || '',
+      departments.find(d => d.value === r.department_id)?.label || '',
+      owners.find(o => o.value === r.owner_id)?.label || '',
+      r.frequency || '',
+      r.remarks || '',
+      r.last_renewed_date || '',
+      r.next_renewal_date || '',
+      r.days_remaining?.toString() || '',
+      r.status || '',
+    ]);
+
+    const csv = [headers, ...data].map(e => e.map(v => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "compliance_data.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const toggleAlertCollapse = (status: 'critical' | 'high' | 'medium') => {
     setAlertsCollapsed((current) => ({
       ...current,
@@ -705,6 +737,8 @@ export default function DashboardClient() {
 
   return (
     <main className="min-h-screen px-6 py-10" style={{ backgroundColor: '#F5F8F4' }}>
+      {/* Dark mode wrapper */}
+      <div className={`${darkMode ? 'dark' : ''}`}>
       {deleteTargetId ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-lg">
@@ -1318,6 +1352,7 @@ export default function DashboardClient() {
           )}
         </section>
       </div>
+    </div>
     </main>
   );
 }
