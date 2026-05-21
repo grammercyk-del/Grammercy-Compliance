@@ -4,7 +4,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import IsEditorContext from './isEditorContext';
 import { getBrowserSupabaseClient } from '@/lib/supabase/client';
-import { validateCompliance, validateNewCompliance } from '@/lib/validation/schemas';
+import { validateCompliancePatch, validateNewCompliance } from '@/lib/validation/schemas';
 
 type ComplianceRow = {
   compliance_id: string;
@@ -505,10 +505,10 @@ export default function DashboardClient() {
     }
 
     // Joi validate the payload before submitting
-    const validationResult = validateCompliance(payload);
+    const validationResult = validateCompliancePatch(payload);
     if (!validationResult.isValid) {
-      const firstError = Object.values(validationResult.errors)[0];
-      return firstError || 'Invalid field value';
+      const firstError: string = Object.values(validationResult.errors)[0] || 'Invalid field value';
+      return firstError;
     }
 
     setCompliances((current) =>
