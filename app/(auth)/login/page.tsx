@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { getBrowserSupabaseClient } from '@/lib/supabase/client';
+import { validateEmail } from '@/lib/validation/schemas';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -12,6 +13,14 @@ export default function LoginPage() {
     event.preventDefault();
     setLoading(true);
     setMessage(null);
+
+    // Joi validate the email before submitting
+    const emailError = validateEmail(email);
+    if (emailError) {
+      setMessage(emailError);
+      setLoading(false);
+      return;
+    }
 
     const supabase = getBrowserSupabaseClient();
     const redirectTo = `${window.location.origin}/auth/callback`;

@@ -4,6 +4,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import IsEditorContext from './isEditorContext';
 import { getBrowserSupabaseClient } from '@/lib/supabase/client';
+import { validateCompliance, validateNewCompliance } from '@/lib/validation/schemas';
 
 type ComplianceRow = {
   compliance_id: string;
@@ -503,6 +504,13 @@ export default function DashboardClient() {
       (payload as any)[field] = value;
     }
 
+    // Joi validate the payload before submitting
+    const validationResult = validateCompliance(payload);
+    if (!validationResult.isValid) {
+      const firstError = Object.values(validationResult.errors)[0];
+      return firstError || 'Invalid field value';
+    }
+
     setCompliances((current) =>
       current.map((row) => (row.compliance_id === rowId ? { ...row, ...updatedRow } : row))
     );
@@ -529,6 +537,21 @@ export default function DashboardClient() {
       days_remaining: null,
       status: 'normal',
     };
+
+    // Joi validate the new compliance data
+    const validationResult = validateNewCompliance({
+      certificate_name: newCompliance.certificate_name,
+      category_id: newCompliance.category_id,
+      department_id: newCompliance.department_id,
+      owner_id: newCompliance.owner_id,
+      last_renewed_date: newCompliance.last_renewed_date,
+      next_renewal_date: newCompliance.next_renewal_date,
+    });
+    if (!validationResult.isValid) {
+      const firstError = Object.values(validationResult.errors)[0];
+      alert(firstError || 'Invalid compliance data');
+      return;
+    }
 
     const tempRow: TableRow = {
       compliance_id: `new-${Date.now()}`,
