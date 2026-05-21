@@ -1,10 +1,3 @@
 {
-  "deploymentProtection": {
-    "preview": {
-      "access": "public"
-    },
-    "production": {
-      "access": "public"
-    }
-  }
+  "framework": "nextjs"
 }
