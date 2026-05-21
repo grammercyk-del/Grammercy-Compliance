@@ -70,12 +70,12 @@ type EditableCellProps = {
 };
 
 const statusClasses: Record<string, string> = {
-  normal: 'bg-green-100 text-green-700 ring-green-300',
-  due_soon: 'bg-yellow-100 text-yellow-700 ring-yellow-300',
-  critical: 'bg-red-100 text-red-700 ring-red-300',
-  expired: 'bg-red-200 text-red-800 ring-red-400',
-  unknown: 'bg-gray-100 text-gray-600 ring-gray-300',
+  normal: 'bg-green-100 text-green-700',
+  due_soon: 'bg-yellow-100 text-yellow-700',
+  critical: 'bg-red-100 text-red-700',
+  expired: 'bg-red-200 text-red-800',
 };
+
 
 function EditableCell({ row, field, value, isEditor, type, options, onSave }: EditableCellProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -730,24 +730,14 @@ export default function DashboardClient() {
       return false;
     }
 
-    if (filterOwner && row.owner_id !== filterOwner) {
-      return false;
-    }
-
-    if (filterCategory && row.category_id !== filterCategory) {
-      return false;
-    }
-
-    if (filterDepartment && row.department_id !== filterDepartment) {
-      return false;
-    }
-
-    if (filterStatus !== 'all' && row.status?.toLowerCase() !== filterStatus) {
-      return false;
-    }
+    if (filterOwner && row.owner_id !== filterOwner) return false;
+    if (filterCategory && row.category_id !== filterCategory) return false;
+    if (filterDepartment && row.department_id !== filterDepartment) return false;
+    if (filterStatus !== 'all' && row.status !== filterStatus) return false;
 
     return true;
   });
+
 
   const resetFilters = () => {
     setSearchQuery('');
@@ -772,6 +762,7 @@ export default function DashboardClient() {
   const totalAlerts = alerts.length;
 
   const alertSectionMeta: Record<'critical' | 'high' | 'medium', { label: string; ringClass: string; bgClass: string; textClass: string }> = {
+
     critical: {
       label: '🔴 Critical',
       ringClass: 'ring-red-300',
@@ -1097,31 +1088,32 @@ export default function DashboardClient() {
             <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">Loading compliances...</div>
           ) : loadError ? (
             <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-red-600">{loadError}</div>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+              ) : (
+            <div className="overflow-x-auto">
               <table className="min-w-full border-collapse text-left text-sm text-gray-700">
                 <thead className="bg-gray-50 text-gray-500">
                   <tr>
+
                     <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[140px]">Certificate No</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[180px]">Certificate Name</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[150px]">Category</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[150px]">Department</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[150px]">Owner</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[130px]">Frequency</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[200px]">Certificate Name</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[160px]">Category</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[200px]">Department</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[200px]">Owner</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[160px]">Frequency</th>
                     <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[200px]">Remarks</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[140px]">Last Renewed</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[140px]">Next Renewal</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[120px]">Days Remaining</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[100px]">Status</th>
-                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[140px]">Notes</th>
-                    {isEditor ? <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[120px]">Actions</th> : null}
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[180px]">Last Renewed Date</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[180px]">Next Renewal Date</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[180px]">Days Remaining</th>
+                    <th className="whitespace-nowrap border-b border-gray-200 px-4 py-3 font-medium min-w-[140px]">Status</th>
+
                   </tr>
                 </thead>
                 <tbody>
                   {filteredCompliances.map((row) => (
                     <tr key={row.compliance_id} className="even:bg-gray-50 hover:bg-gray-100">
-                      <td className="border-b border-gray-200 px-4 py-3 text-gray-600">{row.certificate_no}</td>
+                      <td className="border-b border-gray-200 px-4 py-3 text-gray-700">{row.certificate_no}</td>
                       <td className="border-b border-gray-200 px-4 py-3">
+
                         <EditableCell
                           row={row}
                           field="certificate_name"
@@ -1219,42 +1211,13 @@ export default function DashboardClient() {
                           onSave={handleSave}
                         />
                       </td>
-                      <td className="border-b border-gray-200 px-4 py-3 text-gray-600">{row.days_remaining ?? '—'}</td>
+                      <td className="border-b border-gray-200 px-4 py-3 text-gray-700">{row.days_remaining ?? '—'}</td>
                       <td className="border-b border-gray-200 px-4 py-3">
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ${statusClasses[row.status] ?? statusClasses.normal}`}>
+                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusClasses[row.status] ?? statusClasses.normal}`}>
                           {row.status}
                         </span>
                       </td>
-                      <td className="border-b border-gray-200 px-4 py-3">
-                        <EditableCell
-                          row={row}
-                          field={"remarks" as keyof ComplianceRow}
-                          value={(row as any).notes}
-                          isEditor={isEditor}
-                          type="text"
-                          onSave={handleSave}
-                        />
-                      </td>
-                      {isEditor ? (
-                        <td className="border-b border-gray-200 px-4 py-3">
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleDuplicateRow(row.compliance_id)}
-                              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 transition hover:bg-gray-100"
-                            >
-                              Duplicate
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => confirmDeleteRow(row.compliance_id)}
-                              className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-600 transition hover:bg-red-100"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      ) : null}
+
                     </tr>
                   ))}
                 </tbody>
