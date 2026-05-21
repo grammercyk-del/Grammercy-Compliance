@@ -311,41 +311,112 @@ export default function DashboardClient() {
   };
 
   const refreshAlerts = async () => {
-    const supabase = getBrowserSupabaseClient();
-    const result = await supabase
-      .from('critical_alerts')
-      .select('certificate_name, owner_name, category_name, days_remaining, status');
-
-    if (result.error) {
-      console.error('Error loading critical alerts:', result.error);
-      setAlerts([]);
-      return;
-    }
-
-    setAlerts((result.data ?? []) as AlertRow[]);
+    // Strict spec: alerts MUST depend on days_remaining.
+    // We compute alerts from `compliances_with_status` rows (already includes days_remaining).
+    // Stop using `critical_alerts` table to avoid schema/status mismatch.
+    //
+    // Keep async signature for minimal refactor risk.
+    setAlerts(
+      compliesToAlerts(
+        compliesRowsToAlertsRows(compliances, owners, categories)
+      )
+    );
   };
 
+  // Helper: convert compliance rows into alert rows (no dependency on backend status labels)
+  function compliesRowsToAlertsRows(
+    rows: TableRow[],
+    ownersLookup: SelectOption[],
+    categoriesLookup: SelectOption[]
+  ): AlertRow[] {
+    return rows
+      .filter((r) => typeof r.days_remaining === 'number')
+      .map((r) => {
+        const ownerName = ownersLookup.find((o) => o.value === r.owner_id)?.label || 'Unknown';
+        const categoryName = categoriesLookup.find((c) => c.value === r.category_id)?.label || 'Unknown';
+
+        let status: AlertRow['status'];
+        if (r.days_remaining! < 0) status = 'expired';
+        else if (r.days_remaining! <= 7) status = 'critical';
+        else if (r.days_remaining! <= 30) status = 'due_soon';
+        else status = 'normal';
+
+        return {
+          certificate_name: r.certificate_name,
+          owner_name: ownerName,
+          category_name: categoryName,
+          days_remaining: r.days_remaining as number,
+          status,
+        };
+      })
+      .filter((a) => a.status === 'critical' || a.status === 'due_soon' || a.status === 'expired');
+  }
+
+  function compliesToAlerts(rows: AlertRow[]): AlertRow[] {
+    return rows;
+  }
+
+
   const refreshOwnerRiskScores = () => {
-    const ownerMap: Record<string, { owner_name: string; total_active: number; critical_count: number; high_count: number; medium_count: number; normal_count: number; risk_score: number }> = {};
+    // Strict spec:
+    // - critical: days_remaining <= 7
+    // - due_soon: 8..30
+    // - normal: > 30
+    // risk_score = (critical*3 + due_soon*1) / total
+    const ownerMap: Record<
+      string,
+      {
+        owner_name: string;
+        total_active: number;
+        critical_count: number;
+        high_count: number; // keep for backwards UI; maps to expired
+        medium_count: number; // keep for backwards UI; maps to due_soon
+        normal_count: number;
+        risk_score: number;
+      }
+    > = {};
 
     compliances.forEach((row) => {
       if (!row.owner_id) return;
+      if (typeof row.days_remaining !== 'number') return;
+
       const ownerName = owners.find((o) => o.value === row.owner_id)?.label || 'Unknown';
       if (!ownerMap[row.owner_id]) {
-        ownerMap[row.owner_id] = { owner_name: ownerName, total_active: 0, critical_count: 0, high_count: 0, medium_count: 0, normal_count: 0, risk_score: 0 };
+        ownerMap[row.owner_id] = {
+          owner_name: ownerName,
+          total_active: 0,
+          critical_count: 0,
+          high_count: 0,
+          medium_count: 0,
+          normal_count: 0,
+          risk_score: 0,
+        };
       }
+
       const o = ownerMap[row.owner_id];
       o.total_active += 1;
-      if (row.status === 'critical') o.critical_count += 1;
-      else if (row.status === 'due_soon') o.medium_count += 1;
-      else if (row.status === 'expired') o.high_count += 1;
-      else if (row.status === 'normal') o.normal_count += 1;
+
+      if (row.days_remaining < 0) {
+        // expired
+        o.high_count += 1;
+      } else if (row.days_remaining <= 7) {
+        o.critical_count += 1;
+      } else if (row.days_remaining <= 30) {
+        o.medium_count += 1; // due_soon bucket
+      } else {
+        o.normal_count += 1;
+      }
     });
 
-    const scores = Object.values(ownerMap).map((o) => ({
-      ...o,
-      risk_score: Number(((o.critical_count * 3 + o.high_count * 2 + o.medium_count * 1) / Math.max(o.total_active, 1)).toFixed(2)),
-    })).sort((a, b) => b.risk_score - a.risk_score);
+    const scores = Object.values(ownerMap)
+      .map((o) => {
+        const critical = o.critical_count;
+        const dueSoon = o.medium_count;
+        const total = Math.max(o.total_active, 1);
+        const risk_score = Number(((critical * 3 + dueSoon * 1) / total).toFixed(2));
+        return { ...o, risk_score };
+      })
+      .sort((a, b) => b.risk_score - a.risk_score);
 
     setOwnerRiskScores(scores);
   };
