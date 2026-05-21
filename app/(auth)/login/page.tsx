@@ -22,6 +22,13 @@ export default function LoginPage() {
       return;
     }
 
+    // Only @kesariprojects.com emails can sign in
+    if (!email.toLowerCase().endsWith('@kesariprojects.com')) {
+      setMessage('Only @kesariprojects.com email addresses are allowed to sign in.');
+      setLoading(false);
+      return;
+    }
+
     const supabase = getBrowserSupabaseClient();
     const redirectTo = `${window.location.origin}/auth/callback`;
     const { error } = await supabase.auth.signInWithOtp({
@@ -45,21 +52,16 @@ export default function LoginPage() {
     <main className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F5F8F4' }}>
       <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
         <div className="text-center mb-8">
-          <img
-            src="/kipl-logo.svg"
-            alt="KIPL Logo"
-            className="mx-auto h-16 w-auto mb-4"
-          />
           <h1 className="text-2xl font-bold text-green-800">
-            Kesari Infrabuild Pvt. Ltd.
+            GRAMMERCY DASHBOARD
           </h1>
           <p className="text-gray-600 mt-1">
-            Compliance dashboard by KIPL for Grammercy
+            Compliance dashboard by <strong>KIPL</strong> for Grammercy
           </p>
         </div>
 
         <h2 className="text-xl font-semibold text-gray-800">Sign in</h2>
-        <p className="mt-1 text-sm text-gray-500">Enter your email to receive a magic link.</p>
+        <p className="mt-1 text-sm text-gray-500">Enter your @kesariprojects.com email to receive a magic link.</p>
 
         <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
           <label className="block">
@@ -70,7 +72,7 @@ export default function LoginPage() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-800 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
-              placeholder="you@example.com"
+              placeholder="you@kesariprojects.com"
             />
           </label>
 

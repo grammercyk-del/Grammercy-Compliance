@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Auth disabled temporarily for stability
+  // Allow all routes - auth is handled on the client side
   return NextResponse.next();
 }
 
