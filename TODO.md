@@ -1,21 +1,10 @@
-# TODO — Compliance Dashboard (Next.js + Supabase)
+# TODO
 
-## Phase 2 — Stabilize App
-- [ ] Fix routing for `/`, `/login`, `/dashboard`
-- [ ] Ensure `/dashboard` actually renders `DashboardClient`
-- [ ] Verify auth redirect issues are not present (middleware already disabled)
-- [ ] Run `npm run build` until successful
+## Admin control + public viewer mode
+- [ ] Update `app/dashboard/page.tsx` to detect role using Supabase session email and pass `isEditor` to `DashboardClient`.
+- [ ] Refactor `app/dashboard/DashboardClient.tsx` to accept `isEditor` prop instead of using `IsEditorContext`.
+- [ ] Remove unused `IsEditorContext` import/usages from `DashboardClient.tsx` and update role display + editor gating.
+- [x] Ensure `/login` route remains as-is for now (session management already stubbed/disabled per current UI).
+- [ ] Run `npm test` / `npm run lint` / `npm run build` to confirm compilation (build currently fails due to missing Next build manifests in this environment).
 
-## Phase 3 — UI Spec (strict)
-- [ ] Refactor `app/dashboard/DashboardClient.tsx` to match strict UI spec
-- [ ] Enforce status colors + status logic purely from `days_remaining`
-- [ ] Ensure summary cards + alerts groups use strict days ranges
-- [ ] Ensure table matches required 11 columns + exact edit behavior
-- [ ] Owner analytics uses strict risk formula
-- [ ] Filters/search use strict derived status
-- [ ] Export CSV only after stable
-
-## Final
-- [ ] Produce AUDIT REPORT + FINAL REPORT
-- [ ] Commit with `final: stable compliance dashboard with full UI spec`
 

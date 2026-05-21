@@ -1,10 +1,10 @@
 "use client";
 
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import IsEditorContext from './isEditorContext';
 import { getBrowserSupabaseClient } from '@/lib/supabase/client';
 import { validateCompliancePatch, validateNewCompliance } from '@/lib/validation/schemas';
+
 
 type ComplianceRow = {
   compliance_id: string;
@@ -266,9 +266,9 @@ function EditableCell({ row, field, value, isEditor, type, options, onSave }: Ed
   );
 }
 
-export default function DashboardClient() {
-  const isEditor = useContext(IsEditorContext);
+export default function DashboardClient({ isEditor }: { isEditor: boolean }) {
   const [compliances, setCompliances] = useState<TableRow[]>([]);
+
   const [owners, setOwners] = useState<SelectOption[]>([]);
   const [categories, setCategories] = useState<SelectOption[]>([]);
   const [departments, setDepartments] = useState<SelectOption[]>([]);
@@ -858,7 +858,8 @@ export default function DashboardClient() {
             <div>
               <p className="text-sm uppercase tracking-[0.3em] text-green-700 font-medium">Protected Dashboard</p>
               <h1 className="mt-2 text-3xl font-semibold text-gray-800">Welcome back, compliance user</h1>
-              <p className="mt-2 text-sm text-gray-500">Role: {isEditor === null ? 'Loading...' : isEditor ? 'Editor' : 'Viewer'}</p>
+<p className="mt-2 text-sm text-gray-500">Role: {isEditor ? 'Admin' : 'Viewer'}</p>
+
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -875,6 +876,23 @@ export default function DashboardClient() {
               >
                 {darkMode ? '☀️ Light' : '🌙 Dark'}
               </button>
+              {isEditor ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const supabase = getBrowserSupabaseClient();
+                    await supabase.auth.signOut();
+                    window.location.reload();
+                  }}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100"
+                >
+                  Logout
+                </button>
+              ) : (
+                <p className="hidden sm:block text-xs text-gray-400">
+                  Read-only mode (editing requires admin login)
+                </p>
+              )}
               <Link
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100"
                 href="/login"
