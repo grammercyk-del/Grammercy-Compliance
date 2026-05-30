@@ -50,7 +50,7 @@ export function SettingsPage() {
         <div className="card p-6 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
           <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">About</h3>
           <p className="text-xs text-blue-700 dark:text-blue-300">
-            <strong>Gramercy Dashboard</strong> v1.0.0 — Compliance Management System by KIPL
+            <strong>Grammercy Compliance Dashboard</strong> v1.0.0 — Compliance Management System by Kesari Infrabuild Pvt. Ltd.
           </p>
           <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
             Built with React, Vite, Supabase, and Tailwind CSS

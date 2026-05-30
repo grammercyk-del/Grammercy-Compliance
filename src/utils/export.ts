@@ -27,7 +27,7 @@ function styledHeader(ws: ExcelJS.Worksheet, columns: { header: string; key: str
 
 export async function exportCompliances(rows: ComplianceRow[], filename = 'compliances') {
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Gramercy Dashboard — KIPL'
+  wb.creator = 'Grammercy Compliance Dashboard — KIPL'
   const ws = wb.addWorksheet('Compliances')
 
   styledHeader(ws, [

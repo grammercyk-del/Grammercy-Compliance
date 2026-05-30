@@ -82,13 +82,13 @@ Follow the prompts to link your project.
 
 ```
 Name: VITE_SUPABASE_URL
-Value: https://ikqqrqakaszwcezgqmbs.supabase.co
+Value: https://vwuufzzpuvgxltrdnpre.supabase.co
 Environment: Production, Preview, Development
 ```
 
 ```
 Name: VITE_SUPABASE_ANON_KEY
-Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrcXFycWFrYXN6d2NlemdxbWJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNjc0MjQsImV4cCI6MjA5NDY0MzQyNH0.Mcj-sWqFbgjC45yD8UB_5uJkOiMLOMw85rfl7l8VLfU
+Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3dXVmenpwdXZneGx0cmRucHJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzc3NjYsImV4cCI6MjA5NTYxMzc2Nn0.hISDFTAFnd_Z4Zak2cA-yQlDwZFb9xlpCLv1ey9U3Es
 Environment: Production, Preview, Development
 ```
 
@@ -104,10 +104,10 @@ Environment: Production, Preview, Development
 
 ```bash
 vercel env add VITE_SUPABASE_URL
-# Paste: https://ikqqrqakaszwcezgqmbs.supabase.co
+# Paste: https://vwuufzzpuvgxltrdnpre.supabase.co
 
 vercel env add VITE_SUPABASE_ANON_KEY
-# Paste: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# Paste: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3dXVmenpwdXZneGx0cmRucHJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwMzc3NjYsImV4cCI6MjA5NTYxMzc2Nn0.hISDFTAFnd_Z4Zak2cA-yQlDwZFb9xlpCLv1ey9U3Es
 
 vercel env add VITE_APP_NAME
 # Type: Gramercy Dashboard

@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
+import { InstallPrompt } from '@/components/Shared/InstallPrompt'
 
 interface AppShellProps {
   children: ReactNode
@@ -8,15 +10,28 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, title }: AppShellProps) {
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
   return (
     <div className="flex h-screen overflow-hidden bg-surface-50 dark:bg-surface-dark">
-      <Sidebar />
+      {/* Mobile backdrop */}
+      {drawerOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={() => setDrawerOpen(false)}
+        />
+      )}
+
+      <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <Navbar title={title} />
+        <Navbar title={title} onMenuClick={() => setDrawerOpen(true)} />
         <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>
       </div>
+
+      <InstallPrompt />
     </div>
   )
 }

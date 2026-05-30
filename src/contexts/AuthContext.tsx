@@ -1,14 +1,13 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
-import { supabase } from '@/lib/supabase'
-import { getCurrentUser } from '@/api/auth'
-import type { UserProfile } from '@/types'
+import { createContext, useContext, useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { supabase } from "@/lib/supabase";
+import type { UserProfile, UserRole } from "@/types";
 
 interface AuthContextValue {
-  user: UserProfile | null
-  loading: boolean
-  isEditor: boolean
-  isViewer: boolean
+  user: UserProfile | null;
+  loading: boolean;
+  isEditor: boolean;
+  isViewer: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -16,45 +15,50 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
   isEditor: false,
   isViewer: false,
-})
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getCurrentUser().then((profile) => {
-      setUser(profile)
-      setLoading(false)
-    })
+    let cancelled = false;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === 'SIGNED_OUT') {
-        setUser(null)
+    // onAuthStateChange fires INITIAL_SESSION immediately on mount —
+    // handles the initial load without a separate getCurrentUser() call
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) {
+        if (!cancelled) { setUser(null); setLoading(false); }
       } else {
-        const profile = await getCurrentUser()
-        setUser(profile)
+        const email = session.user.email ?? '';
+        const role = email.toLowerCase().endsWith('@kesariprojects.com') ? 'editor' : 'viewer';
+        const profile: UserProfile = { id: session.user.id, email, role: role as UserRole };
+        if (!cancelled) { setUser(profile); setLoading(false); }
       }
-      setLoading(false)
-    })
+    });
 
-    return () => subscription.unsubscribe()
-  }, [])
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         loading,
-        isEditor: user?.role === 'editor',
-        isViewer: user?.role === 'viewer',
+        isEditor: !!user && user.email.toLowerCase().endsWith('@kesariprojects.com'),
+        isViewer: !!user && !user.email.toLowerCase().endsWith('@kesariprojects.com'),
       }}
     >
       {children}
     </AuthContext.Provider>
-  )
+  );
 }
 
 export function useAuth() {
-  return useContext(AuthContext)
+  return useContext(AuthContext);
 }
