@@ -6,7 +6,7 @@ export async function fetchCriticalAlerts(): Promise<CriticalAlert[]> {
     .from('critical_alerts')
     .select('*')
     .order('days_remaining', { ascending: true, nullsFirst: true })
-  if (error) throw error
+  if (error) throw new Error(error.message || 'Failed to load critical alerts')
   return (data ?? []) as CriticalAlert[]
 }
 
@@ -15,6 +15,6 @@ export async function fetchOwnerRiskScores(): Promise<OwnerRiskScore[]> {
     .from('owner_risk_scores')
     .select('*')
     .order('risk_score', { ascending: false })
-  if (error) throw error
+  if (error) throw new Error(error.message || 'Failed to load owner risk scores')
   return (data ?? []) as OwnerRiskScore[]
 }
