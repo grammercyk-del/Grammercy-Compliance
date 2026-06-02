@@ -12,6 +12,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    // Namespace the session key so it never bleeds from another Supabase app
+    // running on the same origin (e.g. during local development).
+    storageKey: 'grammercy-compliance-auth',
+    storage: window.localStorage,
   },
   realtime: {
     params: { eventsPerSecond: 10 },
