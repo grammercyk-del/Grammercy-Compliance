@@ -144,8 +144,9 @@ function InlineEditCell({
     }
   };
 
+  // Use || (not ??) so empty strings also fall back to "—"
   const displayValue =
-    type === "date" && value ? formatDate(value) : (value ?? "—");
+    type === "date" && value ? formatDate(value) : (value || "—");
 
   if (!editing) {
     return (
@@ -213,7 +214,7 @@ function InlineSelectCell({
     try {
       await onSave(row.compliance_id, field, newVal);
     } catch {
-      // silent
+      // parent hook surfaces errors via its own error state
     }
   };
 
@@ -223,7 +224,8 @@ function InlineSelectCell({
         className="table-td cursor-pointer hover:bg-brand-50/50 dark:hover:bg-brand-900/10 transition-colors"
         onClick={() => setEditing(true)}
       >
-        <span className="badge-gray">{value ?? "—"}</span>
+        {/* Use || (not ??) so empty strings also fall back to "—" */}
+        <span className="badge-gray">{value || "—"}</span>
       </td>
     );
   }
