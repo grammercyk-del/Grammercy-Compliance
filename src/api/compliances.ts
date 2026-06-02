@@ -6,18 +6,16 @@ import type {
   ComplianceFilters,
 } from "@/types";
 
-/** Fetch all compliances from the reporting view, with optional filters applied client-side */
 export async function fetchCompliances(): Promise<ComplianceRow[]> {
   const { data, error } = await supabase
     .from("compliances_with_status")
     .select("*")
     .order("next_renewal_date", { ascending: true, nullsFirst: false });
 
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Failed to load compliance records");
   return (data ?? []) as ComplianceRow[];
 }
 
-/** Auto-assign owner based on category name */
 export function autoAssignOwner(categoryName: string): string {
   if (categoryName === "MoEF & CC / MPCB") {
     return "Ankit Devadiga";
@@ -25,7 +23,6 @@ export function autoAssignOwner(categoryName: string): string {
   return "Mayank Jain";
 }
 
-/** Calculate next renewal date from last renewed + frequency */
 export function calculateNextRenewal(
   lastRenewed: string | null,
   frequency: string,
@@ -59,7 +56,6 @@ export function calculateNextRenewal(
   return date.toISOString().split("T")[0];
 }
 
-/** Inline update: update a single field on a compliance record */
 export async function inlineUpdateCompliance(
   complianceId: string,
   field: string,
@@ -70,21 +66,18 @@ export async function inlineUpdateCompliance(
     .update({ [field]: value })
     .eq("compliance_id", complianceId);
 
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Failed to update compliance field");
 }
 
-/** Duplicate a compliance row (fetch original, insert copy) */
 export async function duplicateCompliance(complianceId: string): Promise<void> {
-  // Fetch the original record from base table
   const { data: original, error: fetchError } = await supabase
     .from("compliances")
     .select("*")
     .eq("compliance_id", complianceId)
     .single();
 
-  if (fetchError) throw fetchError;
+  if (fetchError) throw new Error(fetchError.message || "Failed to fetch original compliance");
 
-  // Create copy without the id and timestamps
   const rest: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(original)) {
     if (
@@ -100,10 +93,9 @@ export async function duplicateCompliance(complianceId: string): Promise<void> {
     .from("compliances")
     .insert(rest);
 
-  if (insertError) throw insertError;
+  if (insertError) throw new Error(insertError.message || "Failed to duplicate compliance");
 }
 
-/** Apply all active filters to a compliance list (client-side, for flexibility) */
 export function applyFilters(
   rows: ComplianceRow[],
   filters: ComplianceFilters,
@@ -159,7 +151,7 @@ export async function createCompliance(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Failed to create compliance");
   return data as ComplianceRow;
 }
 
@@ -174,7 +166,7 @@ export async function updateCompliance(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Failed to update compliance");
   return data as ComplianceRow;
 }
 
@@ -184,7 +176,7 @@ export async function softDeleteCompliance(
   const { error } = await supabase.rpc("soft_delete_compliance", {
     p_compliance_id: complianceId,
   });
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Failed to delete compliance");
 }
 
 export async function fetchComplianceAudit(complianceId: string) {
@@ -194,7 +186,7 @@ export async function fetchComplianceAudit(complianceId: string) {
     .eq("compliance_id", complianceId)
     .order("changed_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Failed to fetch audit history");
   return data ?? [];
 }
 
@@ -205,6 +197,6 @@ export async function fetchGlobalAudit(limit = 300) {
     .order("changed_at", { ascending: false })
     .limit(limit);
 
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Failed to fetch audit log");
   return data ?? [];
 }
