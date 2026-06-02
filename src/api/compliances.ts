@@ -145,8 +145,8 @@ export async function duplicateCompliance(complianceId: string): Promise<void> {
       .from("compliances")
       .select("*")
       .eq("compliance_id", complianceId)
-      .single()
       .abortSignal(s1)
+      .single()
     if (error) throw new Error(error.message || "Failed to fetch original compliance")
     original = data
   } catch (e) {
@@ -228,8 +228,8 @@ export async function createCompliance(
       .from("compliances")
       .insert(payload)
       .select()
-      .single()
       .abortSignal(signal)
+      .single()
     if (error) throw new Error(error.message || "Failed to create compliance")
     return data as ComplianceRow
   } catch (e) {
@@ -250,8 +250,8 @@ export async function updateCompliance(
       .update(payload)
       .eq("compliance_id", complianceId)
       .select()
-      .single()
       .abortSignal(signal)
+      .single()
     if (error) throw new Error(error.message || "Failed to update compliance")
     return data as ComplianceRow
   } catch (e) {
@@ -312,3 +312,4 @@ export async function fetchGlobalAudit(limit = 300) {
     clear()
   }
 }
+
