@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { fetchCompliances } from '@/api/compliances'
-import type { ComplianceRow } from '@/types'
+import { fetchCompliances, fetchCompliancesPaginated } from '@/api/compliances'
+import type { ComplianceRow, ComplianceFilters, SortState } from '@/types'
 
+/** Fetches ALL compliances with realtime subscription — used by Dashboard, Alerts, Risk. */
 export function useCompliances() {
   const [data, setData] = useState<ComplianceRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,4 +50,45 @@ export function useCompliances() {
   }, [])
 
   return { data, loading, error, refetch: load }
+}
+
+/** Server-side paginated fetch — used by CompliancesPage table. */
+export function useCompliancesPaginated(
+  filters: ComplianceFilters,
+  sort: SortState,
+  page: number,
+  pageSize: number,
+) {
+  const [data, setData] = useState<ComplianceRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    setError(null)
+
+    fetchCompliancesPaginated(filters, sort, page, pageSize)
+      .then((result) => {
+        if (mounted) {
+          setData(result.data)
+          setTotal(result.total)
+          setLoading(false)
+        }
+      })
+      .catch((e: unknown) => {
+        if (mounted) {
+          setError(e instanceof Error ? e.message : 'Failed to fetch compliances')
+          setLoading(false)
+        }
+      })
+
+    return () => { mounted = false }
+  }, [filters, sort, page, pageSize, refreshKey])
+
+  const refetch = useCallback(() => setRefreshKey((k) => k + 1), [])
+
+  return { data, total, loading, error, refetch }
 }
