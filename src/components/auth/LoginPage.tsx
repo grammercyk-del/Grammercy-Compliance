@@ -26,7 +26,15 @@ export function LoginPage() {
         setSuccess("Account created! Check your inbox for a confirmation email, then sign in. (If email confirmation is disabled in Supabase, you can sign in right away.)");
         setIsSignUp(false);
       } else {
-        const result = await trySignIn(email, password);
+        const result = await Promise.race([
+          trySignIn(email, password),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Sign-in timed out. Please check your connection and try again.")),
+              12000
+            )
+          ),
+        ]);
         if (result?.session) {
           navigate("/", { replace: true });
           // Force reload to ensure auth state is picked up

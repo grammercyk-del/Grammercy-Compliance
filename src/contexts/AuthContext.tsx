@@ -76,41 +76,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const email = session.user.email ?? "";
 
-      const { data: roleData, error: roleError } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", session.user.id)
-        .single();
+      try {
+        const { data: roleData, error: roleError } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", session.user.id)
+          .abortSignal(AbortSignal.timeout(8000))
+          .single();
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      if (roleError) {
-        setPermissionError(
-          "Unable to load permissions. Please refresh or contact support."
-        );
-        setUser(null);
+        if (roleError) {
+          setPermissionError(
+            "Unable to load permissions. Please refresh or contact support."
+          );
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        if (!roleData?.role) {
+          setPermissionError(
+            "No permissions assigned to your account. Please contact support."
+          );
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        wasAuthenticatedRef.current = true;
+        const profile: UserProfile = {
+          id: session.user.id,
+          email,
+          role: roleData.role as UserRole,
+        };
+        setUser(profile);
+        setPermissionError(null);
         setLoading(false);
-        return;
+      } catch {
+        if (!cancelled) {
+          setPermissionError(
+            "Connection timed out loading permissions. Please refresh."
+          );
+          setUser(null);
+          setLoading(false);
+        }
       }
-
-      if (!roleData?.role) {
-        setPermissionError(
-          "No permissions assigned to your account. Please contact support."
-        );
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      wasAuthenticatedRef.current = true;
-      const profile: UserProfile = {
-        id: session.user.id,
-        email,
-        role: roleData.role as UserRole,
-      };
-      setUser(profile);
-      setPermissionError(null);
-      setLoading(false);
     });
 
     return () => {
