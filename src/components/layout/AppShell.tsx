@@ -2,7 +2,10 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
+import { OfflineBanner } from '@/components/common/OfflineBanner'
 import { InstallPrompt } from '@/components/Shared/InstallPrompt'
+import { useNetworkStatus } from '@/hooks/useNetworkStatus'
+import { cn } from '@/utils/cn'
 
 interface AppShellProps {
   children: ReactNode
@@ -11,6 +14,7 @@ interface AppShellProps {
 
 export function AppShell({ children, title }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const { isOnline } = useNetworkStatus()
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-50 dark:bg-surface-dark">
@@ -26,7 +30,17 @@ export function AppShell({ children, title }: AppShellProps) {
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Navbar title={title} onMenuClick={() => setDrawerOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-6">
+
+        {/* Offline / reconnected banner sits directly below the navbar */}
+        <OfflineBanner />
+
+        <main
+          className={cn(
+            'flex-1 overflow-y-auto p-6',
+            !isOnline && 'pointer-events-none select-none opacity-60',
+          )}
+          aria-disabled={!isOnline}
+        >
           {children}
         </main>
       </div>
