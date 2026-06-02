@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { ShieldCheck, CheckCircle } from "lucide-react";
+import { ShieldCheck, CheckCircle, AlertTriangle } from "lucide-react";
 import { signUpWithPassword, trySignIn } from "@/api/auth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get("reason") === "expired";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,6 +59,16 @@ export function LoginPage() {
             Compliance Dashboard by KIPL for Grammercy
           </p>
         </div>
+
+        {/* Session expired banner */}
+        {sessionExpired && (
+          <div className="mb-4 flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+            <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Your session has expired. Please sign in again to continue.
+            </p>
+          </div>
+        )}
 
         {/* Card */}
         <div className="card p-6 shadow-card-lg">
