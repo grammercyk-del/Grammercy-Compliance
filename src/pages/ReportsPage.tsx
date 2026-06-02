@@ -1,12 +1,12 @@
-import { Download, FileSpreadsheet } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Download, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { useCompliances } from '@/hooks/useCompliances'
-import { fetchCriticalAlerts } from '@/api/alerts'
-import { fetchOwnerRiskScores } from '@/api/alerts'
+import { fetchCriticalAlerts, fetchOwnerRiskScores } from '@/api/alerts'
 import { exportCompliances, exportAlerts, exportRiskScores } from '@/utils/export'
 import { useToast } from '@/hooks/useToast'
 import { ToastContainer } from '@/components/common/Toast'
-import { useEffect, useState } from 'react'
+import { ErrorMessage } from '@/components/common/ErrorMessage'
 import type { CriticalAlert, OwnerRiskScore } from '@/types'
 
 interface ReportOption {
@@ -20,14 +20,21 @@ interface ReportOption {
 export function ReportsPage() {
   const { data: compliances } = useCompliances()
   const { toasts, push, dismiss } = useToast()
+
   const [alerts, setAlerts] = useState<CriticalAlert[]>([])
   const [risks, setRisks] = useState<OwnerRiskScore[]>([])
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {
     Promise.all([
       fetchCriticalAlerts().then(setAlerts),
       fetchOwnerRiskScores().then(setRisks),
-    ]).catch(() => { /* noop */ })
+    ]).catch((err) => {
+      setFetchError(
+        err instanceof Error ? err.message : 'Failed to load report data. Please refresh the page.'
+      )
+    })
   }, [])
 
   const reports: ReportOption[] = [
@@ -37,7 +44,7 @@ export function ReportsPage() {
       icon: <FileSpreadsheet size={24} />,
       action: async () => {
         await exportCompliances(compliances, 'all_compliances')
-        push(`Exported ${compliances.length} compliances`, 'success')
+        push(`Exported ${compliances.length} compliance${compliances.length === 1 ? '' : 's'}`, 'success')
       },
       disabled: compliances.length === 0,
     },
@@ -47,7 +54,7 @@ export function ReportsPage() {
       icon: <FileSpreadsheet size={24} />,
       action: async () => {
         await exportAlerts(alerts)
-        push(`Exported ${alerts.length} alerts`, 'success')
+        push(`Exported ${alerts.length} alert${alerts.length === 1 ? '' : 's'}`, 'success')
       },
       disabled: alerts.length === 0,
     },
@@ -57,17 +64,24 @@ export function ReportsPage() {
       icon: <FileSpreadsheet size={24} />,
       action: async () => {
         await exportRiskScores(risks)
-        push(`Exported risk scores`, 'success')
+        push('Risk scores exported successfully', 'success')
       },
       disabled: risks.length === 0,
     },
   ]
 
   const handleExport = async (action: () => Promise<void>) => {
+    if (isExporting) return
+    setIsExporting(true)
     try {
       await action()
     } catch (err) {
-      push(err instanceof Error ? err.message : 'Export failed', 'error')
+      push(
+        err instanceof Error ? err.message : 'Export failed. Please try again.',
+        'error'
+      )
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -80,6 +94,23 @@ export function ReportsPage() {
             Generate and export compliance reports in Excel format
           </p>
         </div>
+
+        {fetchError && (
+          <ErrorMessage
+            message={fetchError}
+            onRetry={() => {
+              setFetchError(null)
+              Promise.all([
+                fetchCriticalAlerts().then(setAlerts),
+                fetchOwnerRiskScores().then(setRisks),
+              ]).catch((err) => {
+                setFetchError(
+                  err instanceof Error ? err.message : 'Failed to load report data. Please refresh the page.'
+                )
+              })
+            }}
+          />
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {reports.map((report, i) => (
@@ -94,11 +125,21 @@ export function ReportsPage() {
               </div>
 
               <button
-                className="btn-primary gap-2 mt-auto justify-center"
+                className="btn-primary gap-2 mt-auto justify-center inline-flex items-center"
                 onClick={() => handleExport(report.action)}
-                disabled={report.disabled}
+                disabled={report.disabled || isExporting}
               >
-                <Download size={15} /> Export
+                {isExporting ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Exporting…
+                  </>
+                ) : (
+                  <>
+                    <Download size={15} />
+                    Export
+                  </>
+                )}
               </button>
             </div>
           ))}
