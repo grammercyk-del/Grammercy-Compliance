@@ -48,7 +48,7 @@ export async function createOwner(payload: Omit<Owner, 'owner_id' | 'is_active'>
   const { signal, clear } = createTimeoutSignal()
   try {
     const { data, error } = await supabase
-      .from('owners').insert(payload).select().single().abortSignal(signal)
+      .from('owners').insert(payload).select().abortSignal(signal).single()
     if (error) throw new Error(error.message || 'Failed to create owner')
     return data as Owner
   } catch (e) {
@@ -62,7 +62,7 @@ export async function updateOwner(ownerId: string, payload: Partial<Omit<Owner, 
   const { signal, clear } = createTimeoutSignal()
   try {
     const { data, error } = await supabase
-      .from('owners').update(payload).eq('owner_id', ownerId).select().single().abortSignal(signal)
+      .from('owners').update(payload).eq('owner_id', ownerId).select().abortSignal(signal).single()
     if (error) throw new Error(error.message || 'Failed to update owner')
     return data as Owner
   } catch (e) {
@@ -89,7 +89,7 @@ export async function createCategory(payload: Omit<Category, 'category_id' | 'is
   const { signal, clear } = createTimeoutSignal()
   try {
     const { data, error } = await supabase
-      .from('categories').insert(payload).select().single().abortSignal(signal)
+      .from('categories').insert(payload).select().abortSignal(signal).single()
     if (error) throw new Error(error.message || 'Failed to create category')
     return data as Category
   } catch (e) {
@@ -103,7 +103,7 @@ export async function updateCategory(categoryId: string, payload: Partial<Omit<C
   const { signal, clear } = createTimeoutSignal()
   try {
     const { data, error } = await supabase
-      .from('categories').update(payload).eq('category_id', categoryId).select().single().abortSignal(signal)
+      .from('categories').update(payload).eq('category_id', categoryId).select().abortSignal(signal).single()
     if (error) throw new Error(error.message || 'Failed to update category')
     return data as Category
   } catch (e) {
@@ -130,7 +130,7 @@ export async function createDepartment(payload: Omit<Department, 'department_id'
   const { signal, clear } = createTimeoutSignal()
   try {
     const { data, error } = await supabase
-      .from('departments').insert(payload).select().single().abortSignal(signal)
+      .from('departments').insert(payload).select().abortSignal(signal).single()
     if (error) throw new Error(error.message || 'Failed to create department')
     return data as Department
   } catch (e) {
@@ -144,7 +144,7 @@ export async function updateDepartment(departmentId: string, payload: Partial<Om
   const { signal, clear } = createTimeoutSignal()
   try {
     const { data, error } = await supabase
-      .from('departments').update(payload).eq('department_id', departmentId).select().single().abortSignal(signal)
+      .from('departments').update(payload).eq('department_id', departmentId).select().abortSignal(signal).single()
     if (error) throw new Error(error.message || 'Failed to update department')
     return data as Department
   } catch (e) {
@@ -166,3 +166,4 @@ export async function deleteDepartment(departmentId: string) {
     clear()
   }
 }
+
