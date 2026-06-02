@@ -25,6 +25,7 @@ export function useCompliances() {
     let mounted = true
 
     const safeLoad = async () => {
+      if (!mounted) return
       try {
         setError(null)
         const rows = await fetchCompliances()
@@ -36,15 +37,27 @@ export function useCompliances() {
       }
     }
 
+    // Catch up on missed realtime events the moment the tab regains focus
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') safeLoad()
+    }
+
     safeLoad()
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     const channel = supabase
       .channel('compliances-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'compliances' }, safeLoad)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'compliances' }, () => {
+        // Skip the expensive refetch while the tab is in the background.
+        // handleVisibilityChange will catch up when the user returns.
+        if (document.visibilityState !== 'hidden') safeLoad()
+      })
       .subscribe()
 
     return () => {
       mounted = false
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       supabase.removeChannel(channel)
     }
   }, [])
