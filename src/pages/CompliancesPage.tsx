@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { Plus, Download } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { useCompliances } from "@/hooks/useCompliances";
+import { useCompliancesPaginated } from "@/hooks/useCompliances";
 import { useLookups } from "@/hooks/useLookups";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,28 +13,19 @@ import { AuditModal } from "@/components/modals/AuditModal";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { ToastContainer } from "@/components/common/Toast";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
-import { softDeleteCompliance, duplicateCompliance } from "@/api/compliances";
-import { applyFilters } from "@/api/compliances";
+import { softDeleteCompliance, duplicateCompliance, fetchCompliancesPaginated } from "@/api/compliances";
 import { exportCompliances } from "@/utils/export";
 import type { ComplianceRow, ComplianceFilters, SortState } from "@/types";
 import { DEFAULT_FILTERS } from "@/types";
 
 export function CompliancesPage() {
-  const { data, loading, error, refetch } = useCompliances();
-  const {
-    owners,
-    categories,
-    departments,
-    loading: lookupsLoading,
-  } = useLookups();
+  const { owners, categories, departments, loading: lookupsLoading } = useLookups();
   const { isEditor } = useAuth();
   const { toasts, push, dismiss } = useToast();
 
   const [filters, setFilters] = useState<ComplianceFilters>(DEFAULT_FILTERS);
-  const [sort, setSort] = useState<SortState>({
-    column: "next_renewal_date",
-    direction: "asc",
-  });
+  const [debouncedSearch, setDebouncedSearch] = useState(DEFAULT_FILTERS.search);
+  const [sort, setSort] = useState<SortState>({ column: "next_renewal_date", direction: "asc" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -44,28 +35,29 @@ export function CompliancesPage() {
   const [deleteRow, setDeleteRow] = useState<ComplianceRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Apply filters and sort
-  const filtered = useMemo(() => {
-    let result = applyFilters(data, filters);
+  // Debounce search so we don't fire an API call on every keystroke
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(filters.search), 300)
+    return () => clearTimeout(id)
+  }, [filters.search])
 
-    if (sort.column) {
-      result = [...result].sort((a, b) => {
-        const aVal = a[sort.column as keyof ComplianceRow];
-        const bVal = b[sort.column as keyof ComplianceRow];
-        if (aVal == null && bVal == null) return 0;
-        if (aVal == null) return 1;
-        if (bVal == null) return -1;
-        const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-        return sort.direction === "asc" ? cmp : -cmp;
-      });
-    }
+  // Merge debounced search back into the active filters used for the API call
+  const activeFilters = useMemo(
+    () => ({ ...filters, search: debouncedSearch }),
+    [filters, debouncedSearch],
+  )
 
-    return result;
-  }, [data, filters, sort]);
+  const { data, total, loading, error, refetch } = useCompliancesPaginated(
+    activeFilters,
+    sort,
+    page,
+    pageSize,
+  );
 
-  // Paginate
-  const start = (page - 1) * pageSize;
-  const paged = filtered.slice(start, start + pageSize);
+  const handleFilterChange = (f: ComplianceFilters) => {
+    setFilters(f);
+    setPage(1);
+  };
 
   const handleSort = (col: keyof ComplianceRow) => {
     setSort((s) =>
@@ -73,6 +65,7 @@ export function CompliancesPage() {
         ? { column: col, direction: s.direction === "asc" ? "desc" : "asc" }
         : { column: col, direction: "asc" },
     );
+    setPage(1);
   };
 
   const handleEdit = (row: ComplianceRow) => {
@@ -105,20 +98,16 @@ export function CompliancesPage() {
     }
   };
 
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     try {
-      await exportCompliances(
-        filtered,
-        `compliances_${new Date().toISOString().slice(0, 10)}`,
-      );
-      push(
-        `Exported ${filtered.length} compliance${filtered.length === 1 ? "" : "ies"}`,
-        "success",
-      );
+      // Fetch all matching records for export (up to 10 000)
+      const { data: allRows } = await fetchCompliancesPaginated(activeFilters, sort, 1, 10_000);
+      await exportCompliances(allRows, `compliances_${new Date().toISOString().slice(0, 10)}`);
+      push(`Exported ${allRows.length} compliance${allRows.length === 1 ? "" : "s"}`, "success");
     } catch (err) {
       push(err instanceof Error ? err.message : "Export failed", "error");
     }
-  };
+  }, [activeFilters, sort, push]);
 
   return (
     <AppShell title="Compliances">
@@ -132,17 +121,14 @@ export function CompliancesPage() {
             <button
               className="btn-secondary gap-2 text-sm"
               onClick={handleExport}
-              disabled={filtered.length === 0}
+              disabled={total === 0}
             >
               <Download size={15} /> Export
             </button>
             {isEditor && (
               <button
                 className="btn-primary gap-2 text-sm"
-                onClick={() => {
-                  setEditRow(null);
-                  setShowForm(true);
-                }}
+                onClick={() => { setEditRow(null); setShowForm(true); }}
               >
                 <Plus size={15} /> New Compliance
               </button>
@@ -154,7 +140,7 @@ export function CompliancesPage() {
         {!lookupsLoading && (
           <FilterBar
             filters={filters}
-            onChange={setFilters}
+            onChange={handleFilterChange}
             owners={owners}
             categories={categories}
             departments={departments}
@@ -169,25 +155,22 @@ export function CompliancesPage() {
             className="input max-w-xs"
             value={filters.search}
             onChange={(e) => {
-              setFilters({ ...filters, search: e.target.value });
+              setFilters((f) => ({ ...f, search: e.target.value }));
               setPage(1);
             }}
           />
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-            {filtered.length} result{filtered.length === 1 ? "" : "s"}
+            {total} result{total === 1 ? "" : "s"}
           </p>
         </div>
 
         {/* Table */}
         {error ? (
-          <ErrorMessage
-            message="Failed to load compliances"
-            onRetry={refetch}
-          />
+          <ErrorMessage message="Failed to load compliances" onRetry={refetch} />
         ) : (
           <>
             <ComplianceTable
-              data={paged}
+              data={data}
               loading={loading}
               sort={sort}
               onSort={handleSort}
@@ -198,14 +181,13 @@ export function CompliancesPage() {
               canEdit={isEditor}
             />
 
-            {/* Pagination */}
-            {!loading && filtered.length > 0 && (
+            {!loading && total > 0 && (
               <Pagination
                 page={page}
                 pageSize={pageSize}
-                total={filtered.length}
+                total={total}
                 onChange={setPage}
-                onPageSizeChange={setPageSize}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
               />
             )}
           </>
@@ -214,10 +196,7 @@ export function CompliancesPage() {
         {/* Modals */}
         <ComplianceFormModal
           open={showForm}
-          onClose={() => {
-            setShowForm(false);
-            setEditRow(null);
-          }}
+          onClose={() => { setShowForm(false); setEditRow(null); }}
           onSuccess={(msg) => {
             push(msg, "success");
             setShowForm(false);
