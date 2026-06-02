@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "TOKEN_REFRESH_FAILED") {
+      if ((event as string) === "TOKEN_REFRESH_FAILED") {
         if (!cancelled) {
           wasAuthenticatedRef.current = false;
           setUser(null);
