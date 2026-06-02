@@ -21,16 +21,32 @@ export function useCompliances() {
   }, [])
 
   useEffect(() => {
-    load()
+    let mounted = true
 
-    // Realtime: listen to base table changes, refetch view
+    const safeLoad = async () => {
+      try {
+        setError(null)
+        const rows = await fetchCompliances()
+        if (mounted) setData(rows)
+      } catch (e) {
+        if (mounted) setError(e instanceof Error ? e.message : 'Failed to fetch compliances')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    safeLoad()
+
     const channel = supabase
       .channel('compliances-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'compliances' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'compliances' }, safeLoad)
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
-  }, [load])
+    return () => {
+      mounted = false
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   return { data, loading, error, refetch: load }
 }
