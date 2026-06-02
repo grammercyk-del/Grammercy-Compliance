@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { ShieldAlert, RefreshCw } from "lucide-react";
@@ -10,6 +10,7 @@ interface AuthContextValue {
   permissionError: string | null;
   isEditor: boolean;
   isViewer: boolean;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextValue>({
   permissionError: null,
   isEditor: false,
   isViewer: false,
+  signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -25,17 +27,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
+  // Track whether the current sign-out was triggered intentionally by the user
+  const intentionalSignOutRef = useRef(false);
+  // Track whether the user was previously authenticated in this session
+  const wasAuthenticatedRef = useRef(false);
+
+  const signOut = useCallback(async () => {
+    intentionalSignOutRef.current = true;
+    await supabase.auth.signOut();
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Token refresh failed = session silently expired
+      if (event === "TOKEN_REFRESH_FAILED") {
+        if (!cancelled) {
+          wasAuthenticatedRef.current = false;
+          setUser(null);
+          setPermissionError(null);
+          setLoading(false);
+        }
+        window.location.replace("/login?reason=expired");
+        return;
+      }
+
       if (!session) {
+        const wasAuthenticated = wasAuthenticatedRef.current;
+        const wasIntentional = intentionalSignOutRef.current;
+
+        wasAuthenticatedRef.current = false;
+        intentionalSignOutRef.current = false;
+
         if (!cancelled) {
           setUser(null);
           setPermissionError(null);
           setLoading(false);
+        }
+
+        // SIGNED_OUT while user was active and it wasn't an explicit logout = session expired
+        if (wasAuthenticated && !wasIntentional) {
+          window.location.replace("/login?reason=expired");
         }
         return;
       }
@@ -68,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      wasAuthenticatedRef.current = true;
       const profile: UserProfile = {
         id: session.user.id,
         email,
@@ -90,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     permissionError,
     isEditor: !!user && user.role === "editor",
     isViewer: !!user && user.role === "viewer",
+    signOut,
   };
 
   return (
