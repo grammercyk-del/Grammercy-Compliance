@@ -5,6 +5,7 @@ import type {
   CreateCompliancePayload,
   UpdateCompliancePayload,
   ComplianceFilters,
+  SortState,
 } from "@/types";
 
 export async function fetchCompliances(): Promise<ComplianceRow[]> {
@@ -17,6 +18,58 @@ export async function fetchCompliances(): Promise<ComplianceRow[]> {
       .abortSignal(signal)
     if (error) throw new Error(error.message || "Failed to load compliance records")
     return (data ?? []) as ComplianceRow[]
+  } catch (e) {
+    throw toApiError(e, "Failed to load compliance records")
+  } finally {
+    clear()
+  }
+}
+
+/** Server-side paginated fetch with filters and sort. Used by CompliancesPage. */
+export async function fetchCompliancesPaginated(
+  filters: ComplianceFilters,
+  sort: SortState,
+  page: number,
+  pageSize: number,
+): Promise<{ data: ComplianceRow[]; total: number }> {
+  const { signal, clear } = createTimeoutSignal()
+  try {
+    let query = supabase
+      .from("compliances_with_status")
+      .select("*", { count: "exact" })
+
+    const q = filters.search.trim()
+    if (q) {
+      query = query.or(
+        `certificate_no.ilike.%${q}%,certificate_name.ilike.%${q}%,owner_name.ilike.%${q}%`,
+      )
+    }
+
+    if (filters.owner_id) query = query.eq("owner_id", filters.owner_id)
+    if (filters.category_id) query = query.eq("category_id", filters.category_id)
+    if (filters.department_id) query = query.eq("department_id", filters.department_id)
+    if (filters.renewal_frequency) query = query.eq("renewal_frequency", filters.renewal_frequency)
+    if (filters.date_from) query = query.gte("next_renewal_date", filters.date_from)
+    if (filters.date_to) query = query.lte("next_renewal_date", filters.date_to)
+
+    // overdue_only / due_soon_only take precedence over status
+    if (filters.overdue_only) {
+      query = query.eq("status", "Overdue")
+    } else if (filters.due_soon_only) {
+      query = query.eq("status", "Due Soon")
+    } else if (filters.status) {
+      query = query.eq("status", filters.status)
+    }
+
+    const col = (sort.column ?? "next_renewal_date") as string
+    query = query.order(col, { ascending: sort.direction !== "desc", nullsFirst: false })
+
+    const from = (page - 1) * pageSize
+    query = query.range(from, from + pageSize - 1)
+
+    const { data, error, count } = await query.abortSignal(signal)
+    if (error) throw new Error(error.message || "Failed to load compliance records")
+    return { data: (data ?? []) as ComplianceRow[], total: count ?? 0 }
   } catch (e) {
     throw toApiError(e, "Failed to load compliance records")
   } finally {
