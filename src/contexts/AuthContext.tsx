@@ -27,13 +27,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
-  // Track whether the current sign-out was triggered intentionally by the user
   const intentionalSignOutRef = useRef(false);
-  // Track whether the user was previously authenticated in this session
   const wasAuthenticatedRef = useRef(false);
 
   const signOut = useCallback(async () => {
     intentionalSignOutRef.current = true;
+    // Set loading immediately so ProtectedRoute shows a skeleton instead of
+    // briefly flashing protected content during the async sign-out gap.
+    setLoading(true);
     await supabase.auth.signOut();
   }, []);
 
@@ -43,7 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Token refresh failed = session silently expired
       if (event === "TOKEN_REFRESH_FAILED") {
         if (!cancelled) {
           wasAuthenticatedRef.current = false;
@@ -68,7 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
 
-        // SIGNED_OUT while user was active and it wasn't an explicit logout = session expired
         if (wasAuthenticated && !wasIntentional) {
           window.location.replace("/login?reason=expired");
         }
