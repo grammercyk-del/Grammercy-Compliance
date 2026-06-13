@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/utils/cn'
 
@@ -19,11 +19,64 @@ const sizes = {
 }
 
 export function Modal({ open, onClose, title, children, size = 'md', footer }: ModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
+    if (!open) return
+
+    const previouslyFocused = document.activeElement as HTMLElement | null
+
+    // Lock background scroll while the dialog is open (audit M22).
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const getFocusable = () => {
+      const panel = panelRef.current
+      if (!panel) return [] as HTMLElement[]
+      return Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null)
+    }
+
+    // Move focus into the dialog on open (audit H9).
+    ;(getFocusable()[0] ?? panelRef.current)?.focus()
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+      // Trap Tab / Shift+Tab within the dialog (audit H9).
+      const items = getFocusable()
+      if (items.length === 0) {
+        e.preventDefault()
+        panelRef.current?.focus()
+        return
+      }
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && (active === first || active === panelRef.current)) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = prevOverflow
+      // Restore focus to whatever opened the dialog (audit H9).
+      previouslyFocused?.focus?.()
+    }
+  }, [open, onClose])
 
   if (!open) return null
 
@@ -37,18 +90,24 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }: M
 
       {/* Panel */}
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={cn(
           'relative w-full bg-white dark:bg-surface-dark-50 rounded-2xl shadow-card-lg',
           'border border-slate-200 dark:border-slate-700 animate-slide-in flex flex-col',
-          'max-h-[90vh]',
+          'max-h-[90vh] outline-none',
           sizes[size],
         )}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-base font-semibold text-slate-800 dark:text-white">{title}</h2>
+          <h2 id={titleId} className="text-base font-semibold text-slate-800 dark:text-white">{title}</h2>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             <X size={16} />

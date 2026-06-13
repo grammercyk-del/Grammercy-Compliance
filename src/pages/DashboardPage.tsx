@@ -135,6 +135,7 @@ export function DashboardPage() {
         critical: number;
         active: number;
         overdue: number;
+        dueSoon: number;
         riskScore: number;
       }
     >();
@@ -147,18 +148,27 @@ export function DashboardPage() {
           critical: 0,
           active: 0,
           overdue: 0,
+          dueSoon: 0,
           riskScore: 0,
         });
       }
       const entry = map.get(owner)!;
       entry.total++;
       if (r.status === "Active") entry.active++;
-      if (r.status === "Overdue") entry.overdue++;
+      // "Overdue" here means any past-due item (Overdue + Expired), matching the
+      // owner_risk_scores SQL view's overdue_count.
+      if (r.status === "Overdue" || r.status === "Expired") entry.overdue++;
+      if (r.status === "Due Soon") entry.dueSoon++;
       if (r.days_remaining !== null && r.days_remaining <= 7) entry.critical++;
     });
 
     map.forEach((entry) => {
-      entry.riskScore = Math.min(100, entry.overdue * 50 + entry.critical * 30);
+      // Mirror the canonical owner_risk_scores view exactly so the Dashboard and
+      // the Risk page can never disagree (audit H8): overdue*40 + due_soon*10.
+      entry.riskScore = Math.min(
+        100,
+        entry.overdue * 40 + entry.dueSoon * 10,
+      );
     });
 
     return Array.from(map.entries())

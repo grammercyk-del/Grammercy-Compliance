@@ -117,11 +117,24 @@ export function calculateNextRenewal(
   return date.toISOString().split("T")[0];
 }
 
+/** Columns that may be edited inline from the table. Anything else is rejected. */
+const INLINE_EDITABLE_FIELDS = new Set([
+  "certificate_no",
+  "certificate_name",
+  "renewal_frequency",
+  "last_renewed_date",
+  "next_renewal_date",
+  "notes",
+])
+
 export async function inlineUpdateCompliance(
   complianceId: string,
   field: string,
   value: unknown,
 ): Promise<void> {
+  if (!INLINE_EDITABLE_FIELDS.has(field)) {
+    throw new Error(`Field "${field}" cannot be edited inline`)
+  }
   const { signal, clear } = createTimeoutSignal()
   try {
     const { error } = await supabase

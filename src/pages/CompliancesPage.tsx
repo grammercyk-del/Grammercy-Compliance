@@ -179,6 +179,8 @@ export function CompliancesPage() {
               onAudit={(r) => setAuditRow(r)}
               onDuplicate={handleDuplicate}
               canEdit={isEditor}
+              onInlineSaved={refetch}
+              onInlineError={(msg) => push(msg, "error")}
             />
 
             {!loading && total > 0 && (

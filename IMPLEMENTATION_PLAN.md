@@ -1,5 +1,6 @@
 # Implementation Plan — Gramercy Dashboard Enhancements
 
++++++++++++++++++++++++++
 ## Current State
 
 Project already has: Auth (magic link), Dashboard, Compliances (modal-based edit), Filters, Charts, Alerts, Risk, Audit, Reports, Dark Mode, Sidebar routing.

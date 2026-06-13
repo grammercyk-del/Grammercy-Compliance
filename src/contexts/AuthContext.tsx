@@ -1,8 +1,20 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import type { ReactNode } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { ShieldAlert, RefreshCw } from "lucide-react";
 import type { UserProfile, UserRole } from "@/types";
+
+// Clear any cached Supabase responses held by the PWA service worker so one
+// user's data is never served to the next user / after sign-out (see audit H4).
+async function clearSupabaseCache() {
+  if (typeof caches === "undefined") return;
+  try {
+    await caches.delete("supabase-cache");
+  } catch {
+    /* best-effort; never block sign-out on cache errors */
+  }
+}
 
 interface AuthContextValue {
   user: UserProfile | null;
@@ -36,14 +48,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // briefly flashing protected content during the async sign-out gap.
     setLoading(true);
     await supabase.auth.signOut();
+    await clearSupabaseCache();
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
+    // Resolve the user's role. Kept OUT of the onAuthStateChange callback below
+    // and invoked via setTimeout(0): calling supabase.from(...) synchronously
+    // inside that callback can contend with the auth client's internal
+    // navigator.locks lock during session bootstrap and stall (see audit C3).
+    const resolveSession = async (session: Session) => {
+      const email = session.user.email ?? "";
+
+      try {
+        const { data: roleData, error: roleError } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", session.user.id)
+          .abortSignal(AbortSignal.timeout(8000))
+          .maybeSingle();
+
+        if (cancelled) return;
+
+        if (roleError) {
+          setPermissionError(
+            "Unable to load permissions. Please refresh or contact support."
+          );
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        // If no explicit user_roles row exists, mirror the database's
+        // is_editor() rule rather than locking the user out of the whole app
+        // (see audit H3): @kesariprojects.com → editor, everyone else → viewer.
+        // RLS remains the real security boundary regardless of this value.
+        const role: UserRole = roleData?.role
+          ? (roleData.role as UserRole)
+          : email.toLowerCase().endsWith("@kesariprojects.com")
+            ? "editor"
+            : "viewer";
+
+        wasAuthenticatedRef.current = true;
+        setUser({ id: session.user.id, email, role });
+        setPermissionError(null);
+        setLoading(false);
+      } catch {
+        if (!cancelled) {
+          setPermissionError(
+            "Connection timed out loading permissions. Please refresh."
+          );
+          setUser(null);
+          setLoading(false);
+        }
+      }
+    };
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if ((event as string) === "TOKEN_REFRESH_FAILED") {
         if (!cancelled) {
           wasAuthenticatedRef.current = false;
@@ -74,54 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const email = session.user.email ?? "";
-
-      try {
-        const { data: roleData, error: roleError } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", session.user.id)
-          .abortSignal(AbortSignal.timeout(8000))
-          .single();
-
-        if (cancelled) return;
-
-        if (roleError) {
-          setPermissionError(
-            "Unable to load permissions. Please refresh or contact support."
-          );
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-
-        if (!roleData?.role) {
-          setPermissionError(
-            "No permissions assigned to your account. Please contact support."
-          );
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-
-        wasAuthenticatedRef.current = true;
-        const profile: UserProfile = {
-          id: session.user.id,
-          email,
-          role: roleData.role as UserRole,
-        };
-        setUser(profile);
-        setPermissionError(null);
-        setLoading(false);
-      } catch {
-        if (!cancelled) {
-          setPermissionError(
-            "Connection timed out loading permissions. Please refresh."
-          );
-          setUser(null);
-          setLoading(false);
-        }
-      }
+      // Defer the role lookup out of the auth-state callback (see note above).
+      setTimeout(() => {
+        if (!cancelled) void resolveSession(session);
+      }, 0);
     });
 
     return () => {

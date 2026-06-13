@@ -61,7 +61,7 @@ export function App() {
               <Route
                 path="/audit"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requireEditor>
                     <AuditPage />
                   </ProtectedRoute>
                 }

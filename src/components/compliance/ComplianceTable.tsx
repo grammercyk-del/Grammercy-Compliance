@@ -28,6 +28,10 @@ interface ComplianceTableProps {
   onAudit: (row: ComplianceRow) => void;
   onDuplicate: (row: ComplianceRow) => void;
   canEdit: boolean;
+  /** Called after a successful inline cell save so the page can refetch. */
+  onInlineSaved?: () => void;
+  /** Called when an inline cell save fails so the page can surface an error. */
+  onInlineError?: (message: string) => void;
 }
 
 const COLUMNS: {
@@ -96,6 +100,7 @@ interface InlineEditCellProps {
   field: string;
   onSave: (id: string, field: string, value: string) => Promise<void>;
   type?: "text" | "date";
+  canEdit: boolean;
 }
 
 function InlineEditCell({
@@ -104,6 +109,7 @@ function InlineEditCell({
   field,
   onSave,
   type = "text",
+  canEdit,
 }: InlineEditCellProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(value ?? "");
@@ -147,6 +153,17 @@ function InlineEditCell({
   // Use || (not ??) so empty strings also fall back to "—"
   const displayValue =
     type === "date" && value ? formatDate(value) : (value || "—");
+
+  // Viewers (and anyone without edit rights) get a plain, non-interactive cell.
+  // Client gating is UX only — RLS is the real boundary — but we must not
+  // present an editable affordance that silently fails on save.
+  if (!canEdit) {
+    return (
+      <td className="table-td">
+        <span className={cn(type === "date" && "text-xs")}>{displayValue}</span>
+      </td>
+    );
+  }
 
   if (!editing) {
     return (
@@ -198,12 +215,14 @@ function InlineSelectCell({
   field,
   onSave,
   options,
+  canEdit,
 }: {
   value: string | null;
   row: ComplianceRow;
   field: string;
   onSave: (id: string, field: string, value: string) => Promise<void>;
   options: string[];
+  canEdit: boolean;
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -214,9 +233,18 @@ function InlineSelectCell({
     try {
       await onSave(row.compliance_id, field, newVal);
     } catch {
-      // parent hook surfaces errors via its own error state
+      // The page-level onInlineError surfaces the failure to the user.
     }
   };
+
+  // Read-only cell for non-editors (see InlineEditCell note).
+  if (!canEdit) {
+    return (
+      <td className="table-td">
+        <span className="badge-gray">{value || "—"}</span>
+      </td>
+    );
+  }
 
   if (!editing) {
     return (
@@ -259,6 +287,8 @@ export function ComplianceTable({
   onAudit,
   onDuplicate,
   canEdit,
+  onInlineSaved,
+  onInlineError,
 }: ComplianceTableProps) {
   const [visibleCols, setVisibleCols] = useState<Set<string>>(
     new Set(
@@ -288,6 +318,16 @@ export function ComplianceTable({
     setSavingCell(cellKey);
     try {
       await inlineUpdateCompliance(id, field, value || null);
+      // Refetch so view-computed columns (Status, Days Left, …) reflect the
+      // new value instead of showing stale data (audit H6).
+      onInlineSaved?.();
+    } catch (err) {
+      // Surface the failure instead of silently reverting (audit H7), then
+      // rethrow so the cell restores its previous value.
+      onInlineError?.(
+        err instanceof Error ? err.message : "Failed to save change",
+      );
+      throw err;
     } finally {
       setSavingCell(null);
     }
@@ -387,6 +427,7 @@ export function ComplianceTable({
                           row={row}
                           field="certificate_name"
                           onSave={handleInlineSave}
+                          canEdit={canEdit}
                         />
                       )}
                       {visibleCols.has("owner_name") && (
@@ -412,6 +453,7 @@ export function ComplianceTable({
                             "Bi-Yearly",
                             "One-Time",
                           ]}
+                          canEdit={canEdit}
                         />
                       )}
                       {visibleCols.has("last_renewed_date") && (
@@ -421,6 +463,7 @@ export function ComplianceTable({
                           field="last_renewed_date"
                           onSave={handleInlineSave}
                           type="date"
+                          canEdit={canEdit}
                         />
                       )}
                       {visibleCols.has("next_renewal_date") && (
@@ -430,6 +473,7 @@ export function ComplianceTable({
                           field="next_renewal_date"
                           onSave={handleInlineSave}
                           type="date"
+                          canEdit={canEdit}
                         />
                       )}
                       {visibleCols.has("notes") && (
@@ -438,6 +482,7 @@ export function ComplianceTable({
                           row={row}
                           field="notes"
                           onSave={handleInlineSave}
+                          canEdit={canEdit}
                         />
                       )}
                       {visibleCols.has("status") && (
