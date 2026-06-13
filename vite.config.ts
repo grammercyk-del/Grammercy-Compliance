@@ -41,13 +41,25 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+            // Never cache auth/session, realtime, or storage responses — caching
+            // identity/session payloads is a credential-hygiene problem and can
+            // serve a stale session (audit H5).
+            urlPattern: /^https:\/\/.*\.supabase\.co\/(auth|realtime|storage)\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            // Cache only successful REST reads. The cache is cleared on sign-out
+            // (see AuthContext.signOut) so one user's data is not served to the
+            // next user on a shared device (audit H4).
+            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/.*/i,
             handler: 'NetworkFirst',
+            method: 'GET',
             options: {
               cacheName: 'supabase-cache',
+              cacheableResponse: { statuses: [200] },
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24,
+                maxAgeSeconds: 60 * 60,
               },
             },
           },
