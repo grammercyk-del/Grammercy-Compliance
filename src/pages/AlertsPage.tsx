@@ -135,7 +135,7 @@ export function AlertsPage() {
       const days = r.days_remaining;
       if (days === null) {
         normal.push(r);
-      } else if (days <= 0 || days <= 7) {
+      } else if (days <= 7) {
         critical.push(r);
       } else if (days <= 30) {
         high.push(r);

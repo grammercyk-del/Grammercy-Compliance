@@ -23,10 +23,15 @@ const styles = {
 
 export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 w-80">
+    <div
+      className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 w-80"
+      aria-live="polite"
+      aria-atomic="false"
+    >
       {toasts.map((t) => (
         <div
           key={t.id}
+          role={t.type === 'error' ? 'alert' : 'status'}
           className={cn(
             'flex items-start gap-3 p-3.5 rounded-xl shadow-card-lg',
             'bg-white dark:bg-surface-dark-50 border animate-slide-in',
@@ -37,6 +42,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
           <p className="flex-1 text-sm text-slate-700 dark:text-slate-200">{t.message}</p>
           <button
             onClick={() => onDismiss(t.id)}
+            aria-label="Dismiss notification"
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
           >
             <X size={14} />

@@ -92,11 +92,13 @@ export function DashboardPage() {
       total: data.length,
       active: data.filter((r) => r.status === "Active").length,
       dueSoon: data.filter((r) => r.status === "Due Soon").length,
-      overdue: data.filter((r) => r.status === "Overdue").length,
+      // "Overdue" = all past-due items (Overdue + Expired) so this stat matches
+      // the Critical-Alerts banner and the Critical count below (audit M18).
+      overdue: data.filter(
+        (r) => r.status === "Overdue" || r.status === "Expired",
+      ).length,
       critical: data.filter(
-        (r) =>
-          (r.days_remaining !== null && r.days_remaining <= 7) ||
-          r.status === "Overdue",
+        (r) => r.days_remaining !== null && r.days_remaining <= 7,
       ).length,
     };
   }, [data]);
@@ -112,7 +114,7 @@ export function DashboardPage() {
       const days = r.days_remaining;
       if (days === null) {
         normal.push(r);
-      } else if (days <= 0 || days <= 7) {
+      } else if (days <= 7) {
         critical.push(r);
       } else if (days <= 30) {
         high.push(r);
@@ -295,14 +297,14 @@ export function DashboardPage() {
               />
               <AlertCard
                 items={alerts.medium}
-                title="🟡 Medium (60-90d)"
+                title="🟡 Medium (31-90d)"
                 color="text-yellow-600 dark:text-yellow-400"
                 bgColor="bg-yellow-50 dark:bg-yellow-900/10"
                 borderColor="border-t-yellow-500"
               />
               <AlertCard
                 items={alerts.normal}
-                title="🟢 Normal (>90d)"
+                title="🟢 Normal (90d+ / no date)"
                 color="text-green-600 dark:text-green-400"
                 bgColor="bg-green-50 dark:bg-green-900/10"
                 borderColor="border-t-green-500"

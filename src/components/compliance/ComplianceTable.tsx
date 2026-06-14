@@ -128,6 +128,13 @@ function InlineEditCell({
       setEditing(false);
       return;
     }
+    // Reject malformed dates so an inline edit can't write a garbage value
+    // (audit M14). An empty date is allowed — it clears the field.
+    if (type === "date" && editValue && !/^\d{4}-\d{2}-\d{2}$/.test(editValue)) {
+      setEditValue(value ?? "");
+      setEditing(false);
+      return;
+    }
     setSaving(true);
     try {
       await onSave(row.compliance_id, field, editValue);
@@ -137,7 +144,7 @@ function InlineEditCell({
     } finally {
       setSaving(false);
     }
-  }, [editValue, value, row.compliance_id, field, onSave]);
+  }, [editValue, value, row.compliance_id, field, onSave, type]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {

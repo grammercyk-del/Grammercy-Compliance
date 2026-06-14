@@ -2,6 +2,16 @@ import ExcelJS from 'exceljs'
 import { formatDate } from './date'
 import type { ComplianceRow, CriticalAlert, OwnerRiskScore } from '@/types'
 
+/**
+ * Guard against CSV/Excel formula injection: a cell whose text begins with
+ * =, +, -, @, tab or carriage-return is prefixed with an apostrophe so the
+ * spreadsheet treats it as literal text rather than a formula (audit M27).
+ */
+function safeCell(v: string | null | undefined): string {
+  const s = v ?? ''
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
+}
+
 async function downloadWorkbook(wb: ExcelJS.Workbook, filename: string) {
   try {
     const buffer = await wb.xlsx.writeBuffer()
@@ -54,10 +64,15 @@ export async function exportCompliances(rows: ComplianceRow[], filename = 'compl
     rows.forEach((r) => {
       ws.addRow({
         ...r,
+        certificate_no: safeCell(r.certificate_no),
+        certificate_name: safeCell(r.certificate_name),
+        owner_name: safeCell(r.owner_name),
+        category_name: safeCell(r.category_name),
+        department_name: safeCell(r.department_name),
         last_renewed_date: formatDate(r.last_renewed_date),
         next_renewal_date: formatDate(r.next_renewal_date),
         days_remaining: r.days_remaining ?? '',
-        notes: r.notes ?? '',
+        notes: safeCell(r.notes),
       })
     })
 
@@ -101,6 +116,11 @@ export async function exportAlerts(rows: CriticalAlert[]) {
     rows.forEach((r) => {
       ws.addRow({
         ...r,
+        certificate_no: safeCell(r.certificate_no),
+        certificate_name: safeCell(r.certificate_name),
+        owner_name: safeCell(r.owner_name),
+        category_name: safeCell(r.category_name),
+        department_name: safeCell(r.department_name),
         next_renewal_date: formatDate(r.next_renewal_date),
         days_remaining: r.days_remaining ?? '',
       })
@@ -128,7 +148,7 @@ export async function exportRiskScores(rows: OwnerRiskScore[]) {
       { header: 'Risk Score',  key: 'risk_score',        width: 12 },
     ])
 
-    rows.forEach((r) => ws.addRow(r))
+    rows.forEach((r) => ws.addRow({ ...r, owner_name: safeCell(r.owner_name) }))
 
     await downloadWorkbook(wb, `owner_risk_${new Date().toISOString().slice(0, 10)}.xlsx`)
   } catch (e) {

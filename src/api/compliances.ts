@@ -40,8 +40,12 @@ export async function fetchCompliancesPaginated(
 
     const q = filters.search.trim()
     if (q) {
+      // Quote each pattern and escape embedded quotes/backslashes so commas,
+      // parentheses, etc. in the search term are treated literally rather than
+      // as PostgREST filter syntax (audit M10).
+      const safe = q.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
       query = query.or(
-        `certificate_no.ilike.%${q}%,certificate_name.ilike.%${q}%,owner_name.ilike.%${q}%`,
+        `certificate_no.ilike."%${safe}%",certificate_name.ilike."%${safe}%",owner_name.ilike."%${safe}%"`,
       )
     }
 
@@ -75,46 +79,6 @@ export async function fetchCompliancesPaginated(
   } finally {
     clear()
   }
-}
-
-export function autoAssignOwner(categoryName: string): string {
-  if (categoryName === "MoEF & CC / MPCB") {
-    return "Ankit Devadiga";
-  }
-  return "Mayank Jain";
-}
-
-export function calculateNextRenewal(
-  lastRenewed: string | null,
-  frequency: string,
-): string | null {
-  if (!lastRenewed) return null;
-  const date = new Date(lastRenewed);
-  if (isNaN(date.getTime())) return null;
-
-  switch (frequency) {
-    case "Monthly":
-      date.setMonth(date.getMonth() + 1);
-      break;
-    case "Quarterly":
-      date.setMonth(date.getMonth() + 3);
-      break;
-    case "Half-Yearly":
-      date.setMonth(date.getMonth() + 6);
-      break;
-    case "Yearly":
-      date.setFullYear(date.getFullYear() + 1);
-      break;
-    case "Bi-Yearly":
-      date.setFullYear(date.getFullYear() + 2);
-      break;
-    case "One-Time":
-      return null;
-    default:
-      return null;
-  }
-
-  return date.toISOString().split("T")[0];
 }
 
 /** Columns that may be edited inline from the table. Anything else is rejected. */
@@ -168,9 +132,19 @@ export async function duplicateCompliance(complianceId: string): Promise<void> {
     c1()
   }
 
-  const rest: Record<string, unknown> = {};
+  // Exclude generated / identity columns. certificate_no and is_deleted are
+  // dropped so the copy gets a fresh auto-generated cert number and is never
+  // created already-deleted (audit M11).
+  const SKIP = new Set([
+    "compliance_id",
+    "created_at",
+    "updated_at",
+    "certificate_no",
+    "is_deleted",
+  ]);
+  const rest: Record<string, unknown> = { is_deleted: false };
   for (const [key, value] of Object.entries(original)) {
-    if (key !== "compliance_id" && key !== "created_at" && key !== "updated_at") {
+    if (!SKIP.has(key)) {
       rest[key] = value;
     }
   }
@@ -184,52 +158,6 @@ export async function duplicateCompliance(complianceId: string): Promise<void> {
   } finally {
     c2()
   }
-}
-
-export function applyFilters(
-  rows: ComplianceRow[],
-  filters: ComplianceFilters,
-): ComplianceRow[] {
-  let result = [...rows];
-  const q = filters.search.trim().toLowerCase();
-
-  if (q) {
-    result = result.filter(
-      (r) =>
-        r.certificate_no.toLowerCase().includes(q) ||
-        r.certificate_name.toLowerCase().includes(q) ||
-        r.owner_name.toLowerCase().includes(q),
-    );
-  }
-  if (filters.owner_id)
-    result = result.filter((r) => r.owner_id === filters.owner_id);
-  if (filters.category_id)
-    result = result.filter((r) => r.category_id === filters.category_id);
-  if (filters.department_id)
-    result = result.filter((r) => r.department_id === filters.department_id);
-  if (filters.status)
-    result = result.filter((r) => r.status === filters.status);
-  if (filters.renewal_frequency)
-    result = result.filter(
-      (r) => r.renewal_frequency === filters.renewal_frequency,
-    );
-  if (filters.overdue_only)
-    result = result.filter((r) => r.status === "Overdue");
-  if (filters.due_soon_only)
-    result = result.filter((r) => r.status === "Due Soon");
-
-  if (filters.date_from) {
-    result = result.filter(
-      (r) => r.next_renewal_date && r.next_renewal_date >= filters.date_from,
-    );
-  }
-  if (filters.date_to) {
-    result = result.filter(
-      (r) => r.next_renewal_date && r.next_renewal_date <= filters.date_to,
-    );
-  }
-
-  return result;
 }
 
 export async function createCompliance(

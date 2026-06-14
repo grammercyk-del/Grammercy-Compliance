@@ -63,6 +63,15 @@ export function ComplianceFormModal({
     e.preventDefault()
     if (isSubmitting) return
     if (!form.renewal_frequency) { onError('Please select a renewal frequency'); return }
+    // Dates are ISO (YYYY-MM-DD) so a lexicographic compare is a date compare.
+    if (
+      form.last_renewed_date &&
+      form.next_renewal_date &&
+      form.next_renewal_date < form.last_renewed_date
+    ) {
+      onError('Next renewal date cannot be before the last renewed date')
+      return
+    }
 
     setIsSubmitting(true)
     try {

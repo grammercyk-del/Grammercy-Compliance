@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const intentionalSignOutRef = useRef(false);
   const wasAuthenticatedRef = useRef(false);
+  const resolvedUserIdRef = useRef<string | null>(null);
 
   const signOut = useCallback(async () => {
     intentionalSignOutRef.current = true;
@@ -91,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             : "viewer";
 
         wasAuthenticatedRef.current = true;
+        resolvedUserIdRef.current = session.user.id;
         setUser({ id: session.user.id, email, role });
         setPermissionError(null);
         setLoading(false);
@@ -125,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         wasAuthenticatedRef.current = false;
         intentionalSignOutRef.current = false;
+        resolvedUserIdRef.current = null;
 
         if (!cancelled) {
           setUser(null);
@@ -135,6 +138,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (wasAuthenticated && !wasIntentional) {
           window.location.replace("/login?reason=expired");
         }
+        return;
+      }
+
+      // A token refresh for the already-resolved user doesn't change the role —
+      // skip the redundant lookup and the re-render/flicker it causes (audit M2).
+      if (
+        event === "TOKEN_REFRESHED" &&
+        resolvedUserIdRef.current === session.user.id
+      ) {
         return;
       }
 

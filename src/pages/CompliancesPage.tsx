@@ -24,6 +24,10 @@ export function CompliancesPage() {
   const { toasts, push, dismiss } = useToast();
 
   const [filters, setFilters] = useState<ComplianceFilters>(DEFAULT_FILTERS);
+  // Raw search text is kept separate from `filters` so typing doesn't change the
+  // filter object identity on every keystroke (which defeated the debounce and
+  // refetched per-keystroke — audit M13).
+  const [searchInput, setSearchInput] = useState(DEFAULT_FILTERS.search);
   const [debouncedSearch, setDebouncedSearch] = useState(DEFAULT_FILTERS.search);
   const [sort, setSort] = useState<SortState>({ column: "next_renewal_date", direction: "asc" });
   const [page, setPage] = useState(1);
@@ -37,9 +41,12 @@ export function CompliancesPage() {
 
   // Debounce search so we don't fire an API call on every keystroke
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(filters.search), 300)
+    const id = setTimeout(() => {
+      setDebouncedSearch(searchInput)
+      setPage(1)
+    }, 300)
     return () => clearTimeout(id)
-  }, [filters.search])
+  }, [searchInput])
 
   // Merge debounced search back into the active filters used for the API call
   const activeFilters = useMemo(
@@ -153,11 +160,8 @@ export function CompliancesPage() {
             type="search"
             placeholder="Search by certificate no, name, or owner…"
             className="input max-w-xs"
-            value={filters.search}
-            onChange={(e) => {
-              setFilters((f) => ({ ...f, search: e.target.value }));
-              setPage(1);
-            }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
             {total} result{total === 1 ? "" : "s"}
